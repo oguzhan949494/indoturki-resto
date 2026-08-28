@@ -26,11 +26,22 @@ function Spice({ count }: { count: number }) {
 function ProductVisual({ product }: { product: Product }) {
   return (
     <div className="relative flex h-40 items-center justify-center overflow-hidden rounded-[22px] bg-gradient-to-br from-[#f9e8d5] via-[#fff7eb] to-[#e7c5aa]">
-      <div className="absolute -right-8 -top-8 h-28 w-28 rounded-full bg-[#d9472f]/10" />
-      <div className="absolute -bottom-10 -left-8 h-32 w-32 rounded-full bg-[#9b5c38]/10" />
-      <div className="relative flex h-28 w-28 items-center justify-center rounded-full bg-white/70 text-6xl shadow-[0_14px_30px_rgba(82,42,24,.18)]">
-        🍽️
-      </div>
+      {product.imageUrl ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={product.imageUrl}
+          alt={product.nameTr}
+          className="h-full w-full object-cover"
+        />
+      ) : (
+        <>
+          <div className="absolute -right-8 -top-8 h-28 w-28 rounded-full bg-[#d9472f]/10" />
+          <div className="absolute -bottom-10 -left-8 h-32 w-32 rounded-full bg-[#9b5c38]/10" />
+          <div className="relative flex h-28 w-28 items-center justify-center rounded-full bg-white/70 text-6xl shadow-[0_14px_30px_rgba(82,42,24,.18)]">
+            🍽️
+          </div>
+        </>
+      )}
       {product.isNew && (
         <span className="absolute left-3 top-3 rounded-full bg-[#ef2b1e] px-3 py-1 text-[10px] font-extrabold uppercase tracking-wider text-white">
           Yeni

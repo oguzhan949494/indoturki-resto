@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { createClient } from "@/utils/supabase/client";
 
 type OrderItemRow = {
@@ -206,6 +207,12 @@ export default function AdminPage() {
             <p className="text-xs text-[#7a6f63]">Canlı sipariş ve personel çağrı takibi</p>
           </div>
           <div className="flex items-center gap-2">
+            <Link
+              href="/admin/products"
+              className="rounded-full border border-[#e2ddd3] px-4 py-2 text-xs font-bold text-[#5b4032]"
+            >
+              🖼️ Ürün Görselleri
+            </Link>
             <button
               onClick={() => setSoundOn((v) => !v)}
               className={`rounded-full border px-4 py-2 text-xs font-bold ${

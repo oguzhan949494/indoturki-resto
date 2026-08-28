@@ -18,6 +18,7 @@ export type DbProduct = {
   is_new: boolean | null;
   is_available: boolean;
   sort_order: number;
+  image_url: string | null;
 };
 
 export type Category = {
@@ -38,6 +39,7 @@ export type Product = {
   price: number;
   spicy: number;
   isNew: boolean;
+  imageUrl: string | null;
 };
 
 export type CartLine = {
@@ -69,6 +71,7 @@ export function mapProducts(rows: DbProduct[] | null): Product[] {
     price: Number(row.price_tl),
     spicy: row.spicy_level ?? 0,
     isNew: row.is_new ?? false,
+    imageUrl: row.image_url ?? null,
   }));
 }
 

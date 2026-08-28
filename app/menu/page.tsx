@@ -393,18 +393,28 @@ function TableMenu() {
                 key={product.id}
                 className="rounded-[26px] border border-[#e6d5c4] bg-[#fffaf5] p-4 shadow-[0_8px_30px_rgba(84,47,27,.06)]"
               >
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <h3 className="text-base font-black leading-tight">
-                      {productName(product)}
-                      <Spice count={product.spicy} />
-                    </h3>
-                    <p className="mt-2 text-xs leading-5 text-[#806b5b]">
-                      {productDescription(product)}
-                    </p>
-                  </div>
-                  <div className="shrink-0 rounded-full border border-[#d9c2ae] bg-white px-3 py-1.5 text-sm font-black">
-                    {formatTL(product.price)}
+                <div className="flex items-start gap-3">
+                  {product.imageUrl && (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={product.imageUrl}
+                      alt={productName(product)}
+                      className="h-16 w-16 shrink-0 rounded-2xl object-cover"
+                    />
+                  )}
+                  <div className="flex flex-1 items-start justify-between gap-3">
+                    <div>
+                      <h3 className="text-base font-black leading-tight">
+                        {productName(product)}
+                        <Spice count={product.spicy} />
+                      </h3>
+                      <p className="mt-2 text-xs leading-5 text-[#806b5b]">
+                        {productDescription(product)}
+                      </p>
+                    </div>
+                    <div className="shrink-0 rounded-full border border-[#d9c2ae] bg-white px-3 py-1.5 text-sm font-black">
+                      {formatTL(product.price)}
+                    </div>
                   </div>
                 </div>
                 <button
