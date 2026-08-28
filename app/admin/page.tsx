@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/utils/supabase/client";
 
@@ -101,20 +101,22 @@ export default function AdminPage() {
     setCalls((data as unknown as StaffCallRow[]) ?? []);
   }, [supabase]);
 
+  const notificationAudioRef = useRef<HTMLAudioElement | null>(null);
+
   const playPing = useCallback(() => {
     if (!soundOn) return;
     try {
-      const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.frequency.value = 880;
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-      gain.gain.setValueAtTime(0.15, ctx.currentTime);
-      osc.start();
-      osc.stop(ctx.currentTime + 0.2);
+      if (!notificationAudioRef.current) {
+        notificationAudioRef.current = new Audio("/sounds/new-order.mp3");
+      }
+      const audio = notificationAudioRef.current;
+      audio.currentTime = 0;
+      audio.play().catch(() => {
+        // tarayıcı otomatik ses politikası engelleyebilir - sayfayla bir kez
+        // etkileşime girildikten sonra (tıklama vb.) normalde çalışır
+      });
     } catch {
-      // sessizce yut - tarayıcı otomatik ses politikası engelleyebilir
+      // sessizce yut
     }
   }, [soundOn]);
 
