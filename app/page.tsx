@@ -74,6 +74,8 @@ export default function Home() {
   const [deliveryDate, setDeliveryDate] = useState("");
   const [deliveryTime, setDeliveryTime] = useState("");
   const [orderNumber, setOrderNumber] = useState("");
+  const [completedTotalTL, setCompletedTotalTL] = useState(0);
+  const [completedTotalIDR, setCompletedTotalIDR] = useState(0);
 
   useEffect(() => {
     async function loadData() {
@@ -309,6 +311,8 @@ export default function Home() {
       }
 
       setOrderNumber(`ID-${orderData.order_number}`);
+      setCompletedTotalTL(cartTotal);
+      setCompletedTotalIDR(cartTotalIDR);
       setOrderComplete(true);
       setCart([]);
     } catch (error) {
@@ -606,7 +610,7 @@ export default function Home() {
                   <div className="rounded-2xl border border-[#e5d4c2] bg-white p-5">
                     <div className="text-sm font-black">{tr.totalTL}</div>
                     <div className="mt-1 text-2xl font-black text-[#ef2b1e]">
-                      {formatTL(cartTotal)}
+                      {formatTL(completedTotalTL)}
                     </div>
                     <div className="mt-4 text-sm font-black">{tr.turkeyAccount}</div>
                     <div className="mt-2 rounded-xl bg-[#f8efe6] p-3 text-sm leading-7 text-[#6f5a4b]">
@@ -625,7 +629,7 @@ export default function Home() {
                   <div className="rounded-2xl border border-[#e5d4c2] bg-white p-5">
                     <div className="text-sm font-black">{tr.totalIDR}</div>
                     <div className="mt-1 text-2xl font-black text-[#ef2b1e]">
-                      {formatIDR(cartTotalIDR)}
+                      {formatIDR(completedTotalIDR)}
                     </div>
                     <div className="mt-4 text-sm font-black">{tr.indonesiaAccount}</div>
                     <div className="mt-2 rounded-xl bg-[#f8efe6] p-3 text-sm leading-7 text-[#6f5a4b]">
