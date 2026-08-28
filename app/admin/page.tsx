@@ -9,6 +9,7 @@ type OrderItemRow = {
   product_name_tr: string;
   quantity: number;
   unit_price_tl: number;
+  item_note: string | null;
 };
 
 type OrderRow = {
@@ -74,7 +75,7 @@ export default function AdminPage() {
     const { data, error } = await supabase
       .from("orders")
       .select(
-        "id, order_number, source, table_id, customer_name, customer_phone, delivery_address, total_tl, sambal_requested, order_status, payment_status, created_at, order_items(id, product_name_tr, quantity, unit_price_tl), restaurant_tables(table_number)"
+        "id, order_number, source, table_id, customer_name, customer_phone, delivery_address, total_tl, sambal_requested, order_status, payment_status, created_at, order_items(id, product_name_tr, quantity, unit_price_tl, item_note), restaurant_tables(table_number)"
       )
       .neq("order_status", "completed")
       .order("created_at", { ascending: false });
@@ -292,15 +293,22 @@ export default function AdminPage() {
                     </div>
                   </div>
 
-                  <div className="mt-3 space-y-1 border-t border-[#eee7db] pt-3 text-sm">
+                  <div className="mt-3 space-y-1.5 border-t border-[#eee7db] pt-3 text-sm">
                     {order.order_items?.map((item) => (
-                      <div key={item.id} className="flex justify-between">
-                        <span>
-                          {item.quantity}× {item.product_name_tr}
-                        </span>
-                        <span className="text-[#7a6f63]">
-                          {(item.unit_price_tl * item.quantity).toLocaleString("tr-TR")} TL
-                        </span>
+                      <div key={item.id}>
+                        <div className="flex justify-between">
+                          <span>
+                            {item.quantity}× {item.product_name_tr}
+                          </span>
+                          <span className="text-[#7a6f63]">
+                            {(item.unit_price_tl * item.quantity).toLocaleString("tr-TR")} TL
+                          </span>
+                        </div>
+                        {item.item_note && (
+                          <div className="mt-0.5 rounded-lg bg-amber-50 px-2 py-1 text-xs italic text-amber-800">
+                            📝 {item.item_note}
+                          </div>
+                        )}
                       </div>
                     ))}
                     {order.sambal_requested && (

@@ -160,7 +160,7 @@ function TableMenu() {
           line.product.id === product.id ? { ...line, quantity: line.quantity + 1 } : line
         );
       }
-      return [...current, { product, quantity: 1 }];
+      return [...current, { product, quantity: 1, note: "" }];
     });
   };
 

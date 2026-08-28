@@ -43,6 +43,7 @@ export type Product = {
 export type CartLine = {
   product: Product;
   quantity: number;
+  note: string;
 };
 
 export const ALL_CATEGORY_ID = "__all__";

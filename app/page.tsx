@@ -73,6 +73,7 @@ export default function Home() {
   const [deliveryAddress, setDeliveryAddress] = useState("");
   const [deliveryDate, setDeliveryDate] = useState("");
   const [deliveryTime, setDeliveryTime] = useState("");
+  const [deliveryTiming, setDeliveryTiming] = useState<"now" | "scheduled">("now");
   const [orderNumber, setOrderNumber] = useState("");
   const [completedTotalTL, setCompletedTotalTL] = useState(0);
   const [completedTotalIDR, setCompletedTotalIDR] = useState(0);
@@ -163,12 +164,17 @@ export default function Home() {
     goCart: lang === "tr" ? "Sepete Git →" : "Lihat Keranjang →",
     checkout: lang === "tr" ? "Siparişi Tamamla" : "Selesaikan Pesanan",
     yourCart: lang === "tr" ? "Sepetiniz" : "Keranjang Anda",
+    itemNotePlaceholder:
+      lang === "tr" ? "Bu ürün için not ekle (opsiyonel)..." : "Tambahkan catatan untuk produk ini (opsional)...",
     customerInfo: lang === "tr" ? "Teslimat Bilgileri" : "Informasi Pengiriman",
     name: lang === "tr" ? "Alıcı adı soyadı" : "Nama penerima",
     phone: lang === "tr" ? "Telefon numarası" : "Nomor telepon",
     address: lang === "tr" ? "Teslimat adresi" : "Alamat pengiriman",
     date: lang === "tr" ? "Teslimat tarihi" : "Tanggal pengiriman",
     time: lang === "tr" ? "Teslimat saati" : "Waktu pengiriman",
+    deliveryTimingLabel: lang === "tr" ? "Ne zaman teslim edelim?" : "Kapan ingin dikirim?",
+    deliveryNow: lang === "tr" ? "Şimdi" : "Sekarang",
+    deliveryScheduled: lang === "tr" ? "İleri tarih seç" : "Pilih tanggal lain",
     paymentTitle: lang === "tr" ? "Ödeme Bilgileri" : "Informasi Pembayaran",
     paymentNote:
       lang === "tr"
@@ -227,7 +233,7 @@ export default function Home() {
             : line
         );
       }
-      return [...current, { product, quantity: 1 }];
+      return [...current, { product, quantity: 1, note: "" }];
     });
   };
 
@@ -240,6 +246,14 @@ export default function Home() {
             : line
         )
         .filter((line) => line.quantity > 0)
+    );
+  };
+
+  const updateNote = (productId: string, note: string) => {
+    setCart((current) =>
+      current.map((line) =>
+        line.product.id === productId ? { ...line, note } : line
+      )
     );
   };
 
@@ -293,7 +307,7 @@ export default function Home() {
         unit_price_tl: line.product.price,
         unit_price_idr: line.product.price * idrRate,
         options: [],
-        item_note: null,
+        item_note: line.note?.trim() || null,
       }));
 
       const { error: itemsError } = await supabase
@@ -677,33 +691,42 @@ export default function Home() {
                     {cart.map((line) => (
                       <div
                         key={line.product.id}
-                        className="flex items-center justify-between gap-3 rounded-2xl border border-[#e5d4c2] bg-white p-3"
+                        className="rounded-2xl border border-[#e5d4c2] bg-white p-3"
                       >
-                        <div className="min-w-0">
-                          <div className="font-black">{productName(line.product)}</div>
-                          <div className="text-sm text-[#806b5b]">
-                            {formatTL(line.product.price)} × {line.quantity}
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="min-w-0">
+                            <div className="font-black">{productName(line.product)}</div>
+                            <div className="text-sm text-[#806b5b]">
+                              {formatTL(line.product.price)} × {line.quantity}
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => changeQuantity(line.product.id, -1)}
+                              aria-label={tr.decrease}
+                              className="h-9 w-9 rounded-full border border-[#e5d4c2] font-black"
+                            >
+                              −
+                            </button>
+                            <span className="w-6 text-center font-black">{line.quantity}</span>
+                            <button
+                              type="button"
+                              onClick={() => changeQuantity(line.product.id, 1)}
+                              aria-label={tr.increase}
+                              className="h-9 w-9 rounded-full border border-[#e5d4c2] font-black"
+                            >
+                              +
+                            </button>
                           </div>
                         </div>
-                        <div className="flex items-center gap-2">
-                          <button
-                            type="button"
-                            onClick={() => changeQuantity(line.product.id, -1)}
-                            aria-label={tr.decrease}
-                            className="h-9 w-9 rounded-full border border-[#e5d4c2] font-black"
-                          >
-                            −
-                          </button>
-                          <span className="w-6 text-center font-black">{line.quantity}</span>
-                          <button
-                            type="button"
-                            onClick={() => changeQuantity(line.product.id, 1)}
-                            aria-label={tr.increase}
-                            className="h-9 w-9 rounded-full border border-[#e5d4c2] font-black"
-                          >
-                            +
-                          </button>
-                        </div>
+                        <input
+                          value={line.note}
+                          onChange={(event) => updateNote(line.product.id, event.target.value)}
+                          placeholder={tr.itemNotePlaceholder}
+                          maxLength={200}
+                          className="mt-2 w-full rounded-xl border border-[#eee1d4] bg-[#fffaf4] px-3 py-2 text-xs outline-none focus:border-[#ef2b1e]"
+                        />
                       </div>
                     ))}
                   </div>
@@ -747,22 +770,61 @@ export default function Home() {
                       rows={3}
                       className="sm:col-span-2 rounded-2xl border border-[#e5d4c2] bg-white px-4 py-3 outline-none focus:border-[#ef2b1e]"
                     />
-                    <input
-                      required
-                      type="date"
-                      value={deliveryDate}
-                      onChange={(event) => setDeliveryDate(event.target.value)}
-                      className="rounded-2xl border border-[#e5d4c2] bg-white px-4 py-3 outline-none focus:border-[#ef2b1e]"
-                      aria-label={tr.date}
-                    />
-                    <input
-                      required
-                      type="time"
-                      value={deliveryTime}
-                      onChange={(event) => setDeliveryTime(event.target.value)}
-                      className="rounded-2xl border border-[#e5d4c2] bg-white px-4 py-3 outline-none focus:border-[#ef2b1e]"
-                      aria-label={tr.time}
-                    />
+
+                    <div className="sm:col-span-2">
+                      <p className="mb-2 text-xs font-black uppercase tracking-wide text-[#806b5b]">
+                        {tr.deliveryTimingLabel}
+                      </p>
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setDeliveryTiming("now");
+                            setDeliveryDate("");
+                            setDeliveryTime("");
+                          }}
+                          className={`flex-1 rounded-2xl px-4 py-3 text-sm font-black transition ${
+                            deliveryTiming === "now"
+                              ? "bg-[#ef2b1e] text-white shadow-sm"
+                              : "border border-[#e5d4c2] bg-white text-[#5b4032]"
+                          }`}
+                        >
+                          ⚡ {tr.deliveryNow}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setDeliveryTiming("scheduled")}
+                          className={`flex-1 rounded-2xl px-4 py-3 text-sm font-black transition ${
+                            deliveryTiming === "scheduled"
+                              ? "bg-[#ef2b1e] text-white shadow-sm"
+                              : "border border-[#e5d4c2] bg-white text-[#5b4032]"
+                          }`}
+                        >
+                          🗓️ {tr.deliveryScheduled}
+                        </button>
+                      </div>
+                    </div>
+
+                    {deliveryTiming === "scheduled" && (
+                      <>
+                        <input
+                          required
+                          type="date"
+                          value={deliveryDate}
+                          onChange={(event) => setDeliveryDate(event.target.value)}
+                          className="rounded-2xl border border-[#e5d4c2] bg-white px-4 py-3 outline-none focus:border-[#ef2b1e]"
+                          aria-label={tr.date}
+                        />
+                        <input
+                          required
+                          type="time"
+                          value={deliveryTime}
+                          onChange={(event) => setDeliveryTime(event.target.value)}
+                          className="rounded-2xl border border-[#e5d4c2] bg-white px-4 py-3 outline-none focus:border-[#ef2b1e]"
+                          aria-label={tr.time}
+                        />
+                      </>
+                    )}
                   </div>
                 </div>
 
