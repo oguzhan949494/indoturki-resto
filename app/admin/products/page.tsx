@@ -111,14 +111,37 @@ export default function ProductImagesPage() {
     }
   };
 
+  const toggleAvailability = async (product: Product) => {
+    const nextValue = !product.isAvailable;
+    setErrorId(null);
+
+    // Ekranı hemen güncelle (kullanıcı beklemesin), hata olursa geri al.
+    setProducts((current) =>
+      current.map((p) => (p.id === product.id ? { ...p, isAvailable: nextValue } : p))
+    );
+
+    const { error } = await supabase
+      .from("products")
+      .update({ is_available: nextValue })
+      .eq("id", product.id);
+
+    if (error) {
+      console.error("Stok durumu güncellenemedi:", error);
+      setErrorId(product.id);
+      setProducts((current) =>
+        current.map((p) => (p.id === product.id ? { ...p, isAvailable: !nextValue } : p))
+      );
+    }
+  };
+
   return (
     <main className="min-h-screen bg-[#f3f1ed] text-[#231710]">
       <header className="sticky top-0 z-20 border-b border-[#e2ddd3] bg-white px-4 py-4 sm:px-8">
         <div className="mx-auto flex max-w-5xl items-center justify-between">
           <div>
-            <h1 className="text-xl font-black">Ürün Görselleri</h1>
+            <h1 className="text-xl font-black">Ürün Yönetimi</h1>
             <p className="text-xs text-[#7a6f63]">
-              Her ürünün altındaki "Görsel Yükle" butonuyla kendi fotoğrafını seç.
+              Görsel yükle, stok durumunu aç/kapat.
             </p>
           </div>
           <Link
@@ -147,7 +170,9 @@ export default function ProductImagesPage() {
                   {categoryProducts.map((product) => (
                     <div
                       key={product.id}
-                      className="rounded-2xl border border-[#e2ddd3] bg-white p-3"
+                      className={`rounded-2xl border border-[#e2ddd3] bg-white p-3 transition ${
+                        product.isAvailable ? "" : "opacity-50"
+                      }`}
                     >
                       <div className="mb-3 flex h-32 items-center justify-center overflow-hidden rounded-xl bg-[#f7eee3]">
                         {product.imageUrl ? (
@@ -162,7 +187,30 @@ export default function ProductImagesPage() {
                         )}
                       </div>
                       <div className="text-sm font-black">{product.nameTr}</div>
-                      <div className="mt-3 flex items-center gap-2">
+
+                      <button
+                        onClick={() => toggleAvailability(product)}
+                        className={`mt-2 flex w-full items-center justify-between rounded-xl px-3 py-2 text-xs font-black transition ${
+                          product.isAvailable
+                            ? "bg-green-50 text-green-700"
+                            : "bg-red-50 text-red-700"
+                        }`}
+                      >
+                        <span>{product.isAvailable ? "✅ Stokta" : "⛔ Tükendi"}</span>
+                        <span
+                          className={`relative h-5 w-9 rounded-full transition ${
+                            product.isAvailable ? "bg-green-500" : "bg-[#d8cfc0]"
+                          }`}
+                        >
+                          <span
+                            className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition ${
+                              product.isAvailable ? "left-4" : "left-0.5"
+                            }`}
+                          />
+                        </span>
+                      </button>
+
+                      <div className="mt-2 flex items-center gap-2">
                         <label
                           className={`flex-1 cursor-pointer rounded-xl px-3 py-2 text-center text-xs font-bold text-white transition ${
                             uploadingId === product.id

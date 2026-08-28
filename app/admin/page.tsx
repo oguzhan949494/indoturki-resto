@@ -211,7 +211,7 @@ export default function AdminPage() {
               href="/admin/products"
               className="rounded-full border border-[#e2ddd3] px-4 py-2 text-xs font-bold text-[#5b4032]"
             >
-              🖼️ Ürün Görselleri
+              🖼️ Ürün Yönetimi
             </Link>
             <button
               onClick={() => setSoundOn((v) => !v)}

@@ -40,6 +40,7 @@ export type Product = {
   spicy: number;
   isNew: boolean;
   imageUrl: string | null;
+  isAvailable: boolean;
 };
 
 export type CartLine = {
@@ -72,6 +73,7 @@ export function mapProducts(rows: DbProduct[] | null): Product[] {
     spicy: row.spicy_level ?? 0,
     isNew: row.is_new ?? false,
     imageUrl: row.image_url ?? null,
+    isAvailable: row.is_available ?? true,
   }));
 }
 
