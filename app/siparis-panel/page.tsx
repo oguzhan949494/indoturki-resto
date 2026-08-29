@@ -6,10 +6,27 @@ import { createClient } from "@/utils/supabase/client";
 const supabase = createClient();
 const YENILEME_SANIYE = 5;
 
+interface UrunSatiri {
+  ad: string;
+  adet: number;
+  fiyat: number;
+}
+
+interface Siparis {
+  id: number;
+  ikas_order_id: string;
+  siparis_no: string;
+  musteri_adi: string;
+  urunler: UrunSatiri[];
+  toplam_tutar: number;
+  durum: string;
+  olusturuldu: string;
+}
+
 export default function SiparisPanelPage() {
-  const [siparisler, setSiparisler] = useState([]);
-  const [yazdirilacak, setYazdirilacak] = useState(null);
-  const bilinenIdlerRef = useRef(new Set());
+  const [siparisler, setSiparisler] = useState<Siparis[]>([]);
+  const [yazdirilacak, setYazdirilacak] = useState<Siparis | null>(null);
+  const bilinenIdlerRef = useRef<Set<number>>(new Set());
 
   const siparisleriGetir = useCallback(async () => {
     const { data, error } = await supabase
@@ -23,20 +40,17 @@ export default function SiparisPanelPage() {
       return;
     }
 
-    // Yeni bir sipariş geldiyse sesli uyarı ver
-    const yeniIdler = new Set(data.map((s) => s.id));
-    const ilkYukleme = bilinenIdlerRef.current.size === 0 && data.length === 0;
-    if (!ilkYukleme) {
-      const yeniVarMi = data.some((s) => !bilinenIdlerRef.current.has(s.id));
-      if (yeniVarMi && bilinenIdlerRef.current.size > 0) sesliUyariVer();
-      else if (yeniVarMi && bilinenIdlerRef.current.size === 0 && data.length > 0) {
-        // İlk yüklemede zaten bekleyen siparişler varsa da uyar
-        sesliUyariVer();
-      }
-    }
-    bilinenIdlerRef.current = yeniIdler;
+    const gelenler = (data || []) as Siparis[];
+    const yeniIdler = new Set(gelenler.map((s) => s.id));
+    const oncekiBosMuydu = bilinenIdlerRef.current.size === 0;
+    const yeniVarMi = gelenler.some((s) => !bilinenIdlerRef.current.has(s.id));
 
-    setSiparisler(data);
+    if (yeniVarMi && !(oncekiBosMuydu && gelenler.length === 0)) {
+      sesliUyariVer();
+    }
+
+    bilinenIdlerRef.current = yeniIdler;
+    setSiparisler(gelenler);
   }, []);
 
   useEffect(() => {
@@ -47,7 +61,9 @@ export default function SiparisPanelPage() {
 
   function sesliUyariVer() {
     try {
-      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      const AudioContextSinifi =
+        window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+      const ctx = new AudioContextSinifi();
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
       osc.connect(gain);
@@ -61,9 +77,8 @@ export default function SiparisPanelPage() {
     }
   }
 
-  async function yazdirVeIsaretle(siparis) {
+  async function yazdirVeIsaretle(siparis: Siparis) {
     setYazdirilacak(siparis);
-    // DOM güncellensin diye küçük bir gecikme
     setTimeout(async () => {
       window.print();
       await supabase.from("ikas_siparisler").update({ durum: "yazdirildi" }).eq("id", siparis.id);
@@ -116,7 +131,6 @@ export default function SiparisPanelPage() {
         ))}
       </div>
 
-      {/* Yazdırma alanı — ekranda gizli, sadece Ctrl+P/window.print() sırasında görünür */}
       {yazdirilacak && (
         <div id="yazdirma-alani" style={{ display: "none" }}>
           <style>{`@media print { #yazdirma-alani { display: block !important; } }`}</style>
