@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import type { FormEvent } from "react";
+import Script from "next/script";
 import { createClient } from "@/utils/supabase/client";
 import {
   ALL_CATEGORY_ID,
@@ -84,13 +85,19 @@ export default function Home() {
   const [submitting, setSubmitting] = useState(false);
   const [customerName, setCustomerName] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
+  const [customerEmail, setCustomerEmail] = useState("");
   const [deliveryAddress, setDeliveryAddress] = useState("");
   const [deliveryDate, setDeliveryDate] = useState("");
   const [deliveryTime, setDeliveryTime] = useState("");
   const [deliveryTiming, setDeliveryTiming] = useState<"now" | "scheduled">("now");
   const [orderNumber, setOrderNumber] = useState("");
+  const [completedOrderId, setCompletedOrderId] = useState<string | null>(null);
   const [completedTotalTL, setCompletedTotalTL] = useState(0);
   const [completedTotalIDR, setCompletedTotalIDR] = useState(0);
+  const [showBankInfo, setShowBankInfo] = useState(false);
+  const [paytrToken, setPaytrToken] = useState<string | null>(null);
+  const [paytrLoading, setPaytrLoading] = useState(false);
+  const [paytrError, setPaytrError] = useState<string | null>(null);
 
   useEffect(() => {
     async function loadData() {
@@ -185,12 +192,19 @@ export default function Home() {
     customerInfo: lang === "tr" ? "Teslimat Bilgileri" : "Informasi Pengiriman",
     name: lang === "tr" ? "Alıcı adı soyadı" : "Nama penerima",
     phone: lang === "tr" ? "Telefon numarası" : "Nomor telepon",
+    email: lang === "tr" ? "E-posta adresi" : "Alamat email",
     address: lang === "tr" ? "Teslimat adresi" : "Alamat pengiriman",
     date: lang === "tr" ? "Teslimat tarihi" : "Tanggal pengiriman",
     time: lang === "tr" ? "Teslimat saati" : "Waktu pengiriman",
     deliveryTimingLabel: lang === "tr" ? "Ne zaman teslim edelim?" : "Kapan ingin dikirim?",
     deliveryNow: lang === "tr" ? "Şimdi" : "Sekarang",
     deliveryScheduled: lang === "tr" ? "İleri tarih seç" : "Pilih tanggal lain",
+    payWithCard: lang === "tr" ? "Kart ile Güvenli Öde" : "Bayar dengan Kartu",
+    cardLoading: lang === "tr" ? "Ödeme formu yükleniyor..." : "Memuat formulir pembayaran...",
+    cardErrorRetry: lang === "tr" ? "Tekrar dene" : "Coba lagi",
+    preferBankTransfer:
+      lang === "tr" ? "🏦 Banka havalesi ile ödemek istiyorum" : "🏦 Saya ingin bayar via transfer bank",
+    hideBankTransfer: lang === "tr" ? "Kart ile ödemeye dön" : "Kembali ke pembayaran kartu",
     paymentTitle: lang === "tr" ? "Ödeme Bilgileri" : "Informasi Pembayaran",
     paymentNote:
       lang === "tr"
@@ -286,6 +300,33 @@ export default function Home() {
   );
   const cartTotalIDR = cartTotal * idrRate;
 
+  const fetchPaytrToken = async (orderId: string) => {
+    setPaytrLoading(true);
+    setPaytrError(null);
+    try {
+      const res = await fetch("/api/paytr/get-token", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ orderId }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.token) {
+        setPaytrError(
+          data.error ||
+            (lang === "tr" ? "Ödeme formu yüklenemedi." : "Formulir pembayaran gagal dimuat.")
+        );
+        return;
+      }
+      setPaytrToken(data.token);
+    } catch {
+      setPaytrError(
+        lang === "tr" ? "Ödeme formu yüklenemedi." : "Formulir pembayaran gagal dimuat."
+      );
+    } finally {
+      setPaytrLoading(false);
+    }
+  };
+
   const submitOrder = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (cart.length === 0 || submitting) return;
@@ -298,6 +339,7 @@ export default function Home() {
           source: "delivery",
           customer_name: customerName,
           customer_phone: customerPhone,
+          customer_email: customerEmail,
           delivery_address: deliveryAddress || null,
           delivery_date: deliveryDate || null,
           delivery_time: deliveryTime || null,
@@ -347,10 +389,12 @@ export default function Home() {
       }
 
       setOrderNumber(`ID-${orderData.order_number}`);
+      setCompletedOrderId(orderData.id);
       setCompletedTotalTL(cartTotal);
       setCompletedTotalIDR(cartTotalIDR);
       setOrderComplete(true);
       setCart([]);
+      fetchPaytrToken(orderData.id);
     } catch (error) {
       console.error("SİPARİŞ HATASI:", error);
       alert(
@@ -630,65 +674,122 @@ export default function Home() {
                       🟠 {tr.paymentWaiting}
                     </div>
                   </div>
-                  <p className="mt-4 text-sm leading-6 text-[#6f5a4b]">{tr.paymentNote}</p>
-                </div>
-
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <div className="rounded-2xl border border-[#e5d4c2] bg-white p-5">
-                    <div className="text-sm font-black">{tr.totalTL}</div>
-                    <div className="mt-1 text-2xl font-black text-[#ef2b1e]">
-                      {formatTL(completedTotalTL)}
-                    </div>
-                    <div className="mt-4 text-sm font-black">{tr.turkeyAccount}</div>
-                    <div className="mt-2 rounded-xl bg-[#f8efe6] p-3 text-sm leading-7 text-[#6f5a4b]">
-                      <div>
-                        <span className="font-bold">
-                          {lang === "tr" ? "Hesap sahibi" : "Nama pemilik"}:
-                        </span>{" "}
-                        {bankInfo.tlAccountName || "—"}
-                      </div>
-                      <div className="mt-1 break-all">
-                        <span className="font-bold">IBAN:</span> {bankInfo.tlIban || "—"}
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="rounded-2xl border border-[#e5d4c2] bg-white p-5">
-                    <div className="text-sm font-black">{tr.totalIDR}</div>
-                    <div className="mt-1 text-2xl font-black text-[#ef2b1e]">
-                      {formatIDR(completedTotalIDR)}
-                    </div>
-                    <div className="mt-4 text-sm font-black">{tr.indonesiaAccount}</div>
-                    <div className="mt-2 rounded-xl bg-[#f8efe6] p-3 text-sm leading-7 text-[#6f5a4b]">
-                      <div>
-                        <span className="font-bold">Bank:</span> {bankInfo.idrBank || "—"}
-                      </div>
-                      <div className="mt-1">
-                        <span className="font-bold">
-                          {lang === "tr" ? "Hesap sahibi" : "Nama pemilik"}:
-                        </span>{" "}
-                        {bankInfo.idrAccountName || "—"}
-                      </div>
-                      <div className="mt-1">
-                        <span className="font-bold">
-                          {lang === "tr" ? "Hesap No" : "Nomor rekening"}:
-                        </span>{" "}
-                        {bankInfo.idrAccountNumber || "—"}
-                      </div>
-                    </div>
+                  <div className="mt-3 text-lg font-black text-[#ef2b1e]">
+                    {formatTL(completedTotalTL)}
                   </div>
                 </div>
 
-                <div className="rounded-2xl bg-[#231710] p-4 text-sm leading-6 text-white">
-                  {tr.paymentWaitingText}
-                </div>
+                {!showBankInfo ? (
+                  <div className="space-y-3">
+                    <div className="overflow-hidden rounded-2xl border border-[#e5d4c2] bg-white">
+                      {paytrToken ? (
+                        <>
+                          <Script src="https://www.paytr.com/js/iframeResizer.min.js" strategy="afterInteractive" />
+                          <iframe
+                            src={`https://www.paytr.com/odeme/guvenli/${paytrToken}`}
+                            id="paytriframe"
+                            frameBorder={0}
+                            scrolling="no"
+                            style={{ width: "100%", minHeight: 480 }}
+                          />
+                        </>
+                      ) : paytrLoading ? (
+                        <div className="p-8 text-center text-sm font-bold text-[#806b5b]">
+                          {tr.cardLoading}
+                        </div>
+                      ) : (
+                        <div className="p-8 text-center">
+                          <p className="text-sm font-bold text-red-600">
+                            {paytrError || tr.cardLoading}
+                          </p>
+                          <button
+                            type="button"
+                            onClick={() => completedOrderId && fetchPaytrToken(completedOrderId)}
+                            className="mt-3 rounded-full bg-[#231710] px-4 py-2 text-xs font-bold text-white"
+                          >
+                            {tr.cardErrorRetry}
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setShowBankInfo(true)}
+                      className="w-full text-center text-xs font-bold text-[#806b5b] underline"
+                    >
+                      {tr.preferBankTransfer}
+                    </button>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    <p className="text-sm leading-6 text-[#6f5a4b]">{tr.paymentNote}</p>
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <div className="rounded-2xl border border-[#e5d4c2] bg-white p-5">
+                        <div className="text-sm font-black">{tr.totalTL}</div>
+                        <div className="mt-1 text-2xl font-black text-[#ef2b1e]">
+                          {formatTL(completedTotalTL)}
+                        </div>
+                        <div className="mt-4 text-sm font-black">{tr.turkeyAccount}</div>
+                        <div className="mt-2 rounded-xl bg-[#f8efe6] p-3 text-sm leading-7 text-[#6f5a4b]">
+                          <div>
+                            <span className="font-bold">
+                              {lang === "tr" ? "Hesap sahibi" : "Nama pemilik"}:
+                            </span>{" "}
+                            {bankInfo.tlAccountName || "—"}
+                          </div>
+                          <div className="mt-1 break-all">
+                            <span className="font-bold">IBAN:</span> {bankInfo.tlIban || "—"}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="rounded-2xl border border-[#e5d4c2] bg-white p-5">
+                        <div className="text-sm font-black">{tr.totalIDR}</div>
+                        <div className="mt-1 text-2xl font-black text-[#ef2b1e]">
+                          {formatIDR(completedTotalIDR)}
+                        </div>
+                        <div className="mt-4 text-sm font-black">{tr.indonesiaAccount}</div>
+                        <div className="mt-2 rounded-xl bg-[#f8efe6] p-3 text-sm leading-7 text-[#6f5a4b]">
+                          <div>
+                            <span className="font-bold">Bank:</span> {bankInfo.idrBank || "—"}
+                          </div>
+                          <div className="mt-1">
+                            <span className="font-bold">
+                              {lang === "tr" ? "Hesap sahibi" : "Nama pemilik"}:
+                            </span>{" "}
+                            {bankInfo.idrAccountName || "—"}
+                          </div>
+                          <div className="mt-1">
+                            <span className="font-bold">
+                              {lang === "tr" ? "Hesap No" : "Nomor rekening"}:
+                            </span>{" "}
+                            {bankInfo.idrAccountNumber || "—"}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="rounded-2xl bg-[#231710] p-4 text-sm leading-6 text-white">
+                      {tr.paymentWaitingText}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setShowBankInfo(false)}
+                      className="w-full text-center text-xs font-bold text-[#806b5b] underline"
+                    >
+                      {tr.hideBankTransfer}
+                    </button>
+                  </div>
+                )}
 
                 <button
                   onClick={() => {
                     setCheckoutOpen(false);
                     setOrderComplete(false);
+                    setPaytrToken(null);
+                    setPaytrError(null);
+                    setShowBankInfo(false);
                   }}
-                  className="w-full rounded-2xl bg-[#ef2b1e] px-5 py-4 text-sm font-black text-white"
+                  className="w-full rounded-2xl border border-[#e4d3c1] px-5 py-3 text-sm font-black text-[#5b4032]"
                 >
                   {tr.close}
                 </button>
@@ -814,6 +915,14 @@ export default function Home() {
                       onChange={(event) => setCustomerPhone(event.target.value)}
                       placeholder={tr.phone}
                       className="rounded-2xl border border-[#e5d4c2] bg-white px-4 py-3 outline-none focus:border-[#ef2b1e]"
+                    />
+                    <input
+                      required
+                      type="email"
+                      value={customerEmail}
+                      onChange={(event) => setCustomerEmail(event.target.value)}
+                      placeholder={tr.email}
+                      className="sm:col-span-2 rounded-2xl border border-[#e5d4c2] bg-white px-4 py-3 outline-none focus:border-[#ef2b1e]"
                     />
                     <textarea
                       required
