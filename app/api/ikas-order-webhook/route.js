@@ -76,6 +76,7 @@ export async function POST(request) {
 
   try {
     const payload = await request.json();
+    console.log("İKAS WEBHOOK PAYLOAD:", JSON.stringify(payload));
     const orderId = siparisIdCikar(payload);
     if (!orderId) {
       console.error("Webhook payload'ında sipariş id bulunamadı:", payload);
