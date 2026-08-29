@@ -63,15 +63,24 @@ export default function FiyatSorPage() {
     fiyatSorgula(decodedText);
   }
 
-  // Bazı barkod okuyucular EAN-13'ü UPC-A gibi algılayıp baştaki
-  // rakamı (genelde 0, bazen başka bir rakam) düşürebiliyor.
-  // Bu yüzden okunan koda 0-9 arası her rakamı ekleyerek de
-  // aynı anda soruyoruz — hangisi tabloda varsa o eşleşir.
+  // Barkod okuyucu ile sistemdeki kayıt arasında baştaki
+  // rakam sayısı tutmayabiliyor (fazladan eklenmiş ya da
+  // eksik olabiliyor) — bu yüzden hem baştan bir rakam
+  // ekleyerek hem de baştan bir rakam çıkararak olası tüm
+  // varyasyonları aynı anda deniyoruz.
   function adayBarkodlariUret(okunanKod) {
     const adaylar = [okunanKod];
+
+    // Baştan bir rakam eksik olabilir ihtimaline karşı (0-9 ekle)
     for (let rakam = 0; rakam <= 9; rakam++) {
       adaylar.push(String(rakam) + okunanKod);
     }
+
+    // Baştan fazladan bir rakam gelmiş olabilir ihtimaline karşı (ilk rakamı çıkar)
+    if (okunanKod.length > 1) {
+      adaylar.push(okunanKod.slice(1));
+    }
+
     return adaylar;
   }
 
