@@ -1,72 +1,12 @@
 import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 
 // ============================================================
-// İkas'tan "yeni sipariş oluştu" bildirimini yakalar, siparişin
-// tam detayını ikas API'den çeker, Supabase'e yazar.
+// İkas'tan "yeni sipariş oluştu" webhook'unu yakalar.
+// Önemli: ikas, sipariş verisinin tamamını "data" alanında
+// JSON-STRING olarak gönderiyor (üst seviye "id" alanı sipariş
+// id'si DEĞİL, webhook bildirim id'si). Bu yüzden ekstra bir
+// API çağrısına gerek yok, data'yı parse etmek yeterli.
 // ============================================================
-
-async function ikasAccessTokenAl() {
-  const url = `https://${process.env.IKAS_STORE_NAME}.myikas.com/api/admin/oauth/token`;
-  const res = await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({
-      grant_type: "client_credentials",
-      client_id: process.env.IKAS_CLIENT_ID,
-      client_secret: process.env.IKAS_CLIENT_SECRET,
-    }),
-  });
-  if (!res.ok) throw new Error("İkas token alınamadı: " + (await res.text()));
-  const data = await res.json();
-  return data.access_token;
-}
-
-// Webhook payload'ının şekli garanti olmadığı için, olası tüm
-// yerlerden sipariş id'sini bulmaya çalışıyoruz.
-function siparisIdCikar(payload) {
-  return (
-    payload?.id ||
-    payload?.orderId ||
-    payload?.data?.id ||
-    payload?.data?.orderId ||
-    null
-  );
-}
-
-async function siparisDetayiGetir(accessToken, orderId) {
-  const query = `{
-    listOrder(id: { eq: "${orderId}" }) {
-      data {
-        id
-        orderNumber
-        totalFinalPrice
-        customer { firstName lastName fullName }
-        orderLineItems {
-          quantity
-          finalPrice
-          variant { name }
-        }
-      }
-    }
-  }`;
-
-  const res = await fetch("https://api.myikas.com/api/v1/admin/graphql", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${accessToken}`,
-    },
-    body: JSON.stringify({ query }),
-  });
-
-  if (!res.ok) throw new Error("Sipariş detayı alınamadı: " + (await res.text()));
-  const json = await res.json();
-  if (json.errors) throw new Error(JSON.stringify(json.errors));
-
-  const siparis = json.data.listOrder.data[0];
-  if (!siparis) throw new Error("Sipariş bulunamadı: " + orderId);
-  return siparis;
-}
 
 export async function POST(request) {
   const { searchParams } = new URL(request.url);
@@ -76,23 +16,26 @@ export async function POST(request) {
 
   try {
     const payload = await request.json();
-    console.log("İKAS WEBHOOK PAYLOAD:", JSON.stringify(payload));
-    const orderId = siparisIdCikar(payload);
-    if (!orderId) {
-      console.error("Webhook payload'ında sipariş id bulunamadı:", payload);
-      return Response.json({ error: "orderId bulunamadı" }, { status: 400 });
+    console.log("İKAS WEBHOOK PAYLOAD (ham):", JSON.stringify(payload));
+
+    if (!payload.data) {
+      return Response.json({ error: "payload.data alanı yok" }, { status: 400 });
     }
 
-    const accessToken = await ikasAccessTokenAl();
-    const siparis = await siparisDetayiGetir(accessToken, orderId);
+    const siparis = JSON.parse(payload.data);
+    console.log("PARSE EDİLMİŞ SİPARİŞ:", JSON.stringify(siparis));
 
     const urunler = (siparis.orderLineItems || []).map((satir) => ({
       ad: satir.variant?.name || "Ürün",
       adet: satir.quantity,
-      fiyat: satir.finalPrice,
+      fiyat: satir.finalPrice ?? satir.price ?? 0,
     }));
 
-    const musteriAdi = siparis.customer?.fullName || siparis.customer?.firstName || "";
+    const musteriAdi =
+      siparis.customer?.fullName ||
+      [siparis.customer?.firstName, siparis.customer?.lastName].filter(Boolean).join(" ") ||
+      siparis.personel?.firstName ||
+      "";
 
     const supabaseAdmin = createSupabaseClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -105,7 +48,7 @@ export async function POST(request) {
         siparis_no: siparis.orderNumber,
         musteri_adi: musteriAdi,
         urunler,
-        toplam_tutar: siparis.totalFinalPrice,
+        toplam_tutar: siparis.totalFinalPrice ?? siparis.totalPrice ?? 0,
         durum: "yeni",
       },
       { onConflict: "ikas_order_id" }
