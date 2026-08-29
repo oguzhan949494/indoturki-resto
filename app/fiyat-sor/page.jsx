@@ -1,14 +1,9 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { createClient } from "@supabase/supabase-js";
+import { createClient } from "@/utils/supabase/client";
 
-// Mevcut projende zaten bir Supabase client varsa (örn. "@/lib/supabase")
-// onu import edip aşağıdaki satırı silebilirsin.
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-);
+const supabase = createClient();
 
 // Kendi tablo/kolon adlarına göre düzenle
 const TABLE_NAME = "urunler";
