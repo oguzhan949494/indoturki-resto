@@ -24,30 +24,8 @@ export default function AddressPicker({
   const mapRef = useRef<any>(null);
   const markerRef = useRef<any>(null);
   const [showMap, setShowMap] = useState(false);
-
-  const renderMap = (lat: number, lng: number) => {
-    if (!mapDivRef.current || !window.google) return;
-    if (!mapRef.current) {
-      mapRef.current = new window.google.maps.Map(mapDivRef.current, {
-        center: { lat, lng },
-        zoom: 16,
-        disableDefaultUI: true,
-        zoomControl: true,
-      });
-      markerRef.current = new window.google.maps.Marker({
-        position: { lat, lng },
-        map: mapRef.current,
-        draggable: true,
-      });
-      markerRef.current.addListener("dragend", () => {
-        const pos = markerRef.current.getPosition();
-        onLocationChange(pos.lat(), pos.lng());
-      });
-    } else {
-      mapRef.current.setCenter({ lat, lng });
-      markerRef.current.setPosition({ lat, lng });
-    }
-  };
+  const [pinLat, setPinLat] = useState<number | null>(null);
+  const [pinLng, setPinLng] = useState<number | null>(null);
 
   useEffect(() => {
     if (!loaded || !inputRef.current || !window.google) return;
@@ -65,11 +43,42 @@ export default function AddressPicker({
       const formatted = place.formatted_address || inputRef.current?.value || "";
       onAddressChange(formatted);
       onLocationChange(lat, lng);
+      setPinLat(lat);
+      setPinLng(lng);
       setShowMap(true);
-      renderMap(lat, lng);
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loaded]);
+
+  // Harita kutusu (mapDivRef) ancak showMap true olduktan SONRA DOM'a eklenir.
+  // Bu yüzden haritayı, kutu gerçekten var olduktan sonra (bu effect ile) kuruyoruz.
+  useEffect(() => {
+    if (!showMap || pinLat == null || pinLng == null || !mapDivRef.current || !window.google) {
+      return;
+    }
+
+    if (!mapRef.current) {
+      mapRef.current = new window.google.maps.Map(mapDivRef.current, {
+        center: { lat: pinLat, lng: pinLng },
+        zoom: 16,
+        disableDefaultUI: true,
+        zoomControl: true,
+      });
+      markerRef.current = new window.google.maps.Marker({
+        position: { lat: pinLat, lng: pinLng },
+        map: mapRef.current,
+        draggable: true,
+      });
+      markerRef.current.addListener("dragend", () => {
+        const pos = markerRef.current.getPosition();
+        onLocationChange(pos.lat(), pos.lng());
+      });
+    } else {
+      mapRef.current.setCenter({ lat: pinLat, lng: pinLng });
+      markerRef.current.setPosition({ lat: pinLat, lng: pinLng });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showMap, pinLat, pinLng]);
 
   return (
     <div>
