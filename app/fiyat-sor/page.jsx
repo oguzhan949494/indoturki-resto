@@ -21,7 +21,6 @@ export default function FiyatSorPage() {
   useEffect(() => {
     let html5QrCode;
 
-    // html5-qrcode client-side'da çalışır, dinamik import ile SSR hatasını önlüyoruz
     import("html5-qrcode").then(({ Html5Qrcode, Html5QrcodeSupportedFormats }) => {
       html5QrCode = new Html5Qrcode("reader");
       scannerRef.current = html5QrCode;
@@ -58,20 +57,34 @@ export default function FiyatSorPage() {
       decodedText === lastCodeRef.current.code &&
       now - lastCodeRef.current.time < 3000
     ) {
-      return; // aynı barkodu 3 sn içinde tekrar sorgulama
+      return;
     }
     lastCodeRef.current = { code: decodedText, time: now };
     fiyatSorgula(decodedText);
+  }
+
+  // Bazı barkod okuyucular EAN-13'ü UPC-A gibi algılayıp baştaki
+  // rakamı (genelde 0, bazen başka bir rakam) düşürebiliyor.
+  // Bu yüzden okunan koda 0-9 arası her rakamı ekleyerek de
+  // aynı anda soruyoruz — hangisi tabloda varsa o eşleşir.
+  function adayBarkodlariUret(okunanKod) {
+    const adaylar = [okunanKod];
+    for (let rakam = 0; rakam <= 9; rakam++) {
+      adaylar.push(String(rakam) + okunanKod);
+    }
+    return adaylar;
   }
 
   async function fiyatSorgula(barkod) {
     if (!barkod) return;
     setSonuc("bekleniyor");
 
+    const adaylar = adayBarkodlariUret(barkod.trim());
+
     const { data, error } = await supabase
       .from(TABLE_NAME)
       .select(`${AD_KOLON}, ${FIYAT_KOLON}`)
-      .eq(BARKOD_KOLON, barkod)
+      .in(BARKOD_KOLON, adaylar)
       .limit(1);
 
     if (error || !data || data.length === 0) {
