@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import type { FormEvent } from "react";
 import Script from "next/script";
 import { createClient } from "@/utils/supabase/client";
+import AddressPicker from "@/components/AddressPicker";
 import {
   ALL_CATEGORY_ID,
   categoryAllowsExtraNoodle,
@@ -87,9 +88,16 @@ export default function Home() {
   const [customerPhone, setCustomerPhone] = useState("");
   const [customerEmail, setCustomerEmail] = useState("");
   const [deliveryAddress, setDeliveryAddress] = useState("");
+  const [deliveryLat, setDeliveryLat] = useState<number | null>(null);
+  const [deliveryLng, setDeliveryLng] = useState<number | null>(null);
+  const [courierFee, setCourierFee] = useState<number | null>(null);
+  const [courierDistanceKm, setCourierDistanceKm] = useState<number | null>(null);
+  const [courierFeeLoading, setCourierFeeLoading] = useState(false);
+  const [courierFeeError, setCourierFeeError] = useState<string | null>(null);
   const [deliveryDate, setDeliveryDate] = useState("");
   const [deliveryTime, setDeliveryTime] = useState("");
   const [deliveryTiming, setDeliveryTiming] = useState<"now" | "scheduled">("now");
+  const [orderType, setOrderType] = useState<"delivery" | "pickup" | "dinein">("delivery");
   const [orderNumber, setOrderNumber] = useState("");
   const [completedOrderId, setCompletedOrderId] = useState<string | null>(null);
   const [completedTotalTL, setCompletedTotalTL] = useState(0);
@@ -190,13 +198,29 @@ export default function Home() {
     itemNotePlaceholder:
       lang === "tr" ? "Bu ürün için not ekle (opsiyonel)..." : "Tambahkan catatan untuk produk ini (opsional)...",
     customerInfo: lang === "tr" ? "Teslimat Bilgileri" : "Informasi Pengiriman",
+    orderTypeLabel: lang === "tr" ? "Sipariş şekli" : "Jenis pesanan",
+    orderTypeDelivery: lang === "tr" ? "🚚 Paket Servis" : "🚚 Antar",
+    orderTypePickup: lang === "tr" ? "🏃 Gel Al" : "🏃 Ambil Sendiri",
+    orderTypeDinein: lang === "tr" ? "🍽️ Restoranda Yiyeceğim" : "🍽️ Makan di Tempat",
     name: lang === "tr" ? "Alıcı adı soyadı" : "Nama penerima",
     phone: lang === "tr" ? "Telefon numarası" : "Nomor telepon",
     email: lang === "tr" ? "E-posta adresi" : "Alamat email",
     address: lang === "tr" ? "Teslimat adresi" : "Alamat pengiriman",
+    dragHint:
+      lang === "tr"
+        ? "İşaretçiyi (pin) sürükleyerek tam konumunuzu ayarlayabilirsiniz."
+        : "Anda dapat menyeret pin untuk mengatur lokasi tepat Anda.",
+    courierCalculating: lang === "tr" ? "Kurye ücreti hesaplanıyor..." : "Menghitung ongkos kirim...",
+    courierFeeLabel: lang === "tr" ? "Kurye ücreti" : "Ongkos kirim",
+    subtotalLabel: lang === "tr" ? "Ürünler" : "Produk",
     date: lang === "tr" ? "Teslimat tarihi" : "Tanggal pengiriman",
     time: lang === "tr" ? "Teslimat saati" : "Waktu pengiriman",
-    deliveryTimingLabel: lang === "tr" ? "Ne zaman teslim edelim?" : "Kapan ingin dikirim?",
+    deliveryTimingLabel:
+      orderType === "delivery"
+        ? lang === "tr" ? "Ne zaman teslim edelim?" : "Kapan ingin dikirim?"
+        : orderType === "pickup"
+          ? lang === "tr" ? "Ne zaman gelip alacaksınız?" : "Kapan Anda akan mengambil?"
+          : lang === "tr" ? "Ne zaman geleceksiniz?" : "Kapan Anda akan datang?",
     deliveryNow: lang === "tr" ? "Şimdi" : "Sekarang",
     deliveryScheduled: lang === "tr" ? "İleri tarih seç" : "Pilih tanggal lain",
     payWithCard: lang === "tr" ? "Kart ile Güvenli Öde" : "Bayar dengan Kartu",
@@ -298,7 +322,40 @@ export default function Home() {
     (sum, line) => sum + lineUnitPrice(line) * line.quantity,
     0
   );
-  const cartTotalIDR = cartTotal * idrRate;
+  const grandTotal = orderType === "delivery" ? cartTotal + (courierFee ?? 0) : cartTotal;
+  const grandTotalIDR = grandTotal * idrRate;
+
+  const fetchCourierFee = async (lat: number, lng: number) => {
+    setCourierFeeLoading(true);
+    setCourierFeeError(null);
+    try {
+      const res = await fetch("/api/delivery-fee", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ lat, lng }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setCourierFeeError(data.error || "Kurye ücreti hesaplanamadı.");
+        setCourierFee(null);
+        setCourierDistanceKm(null);
+        return;
+      }
+      setCourierFee(data.feeTl);
+      setCourierDistanceKm(data.distanceKm);
+    } catch {
+      setCourierFeeError("Kurye ücreti hesaplanamadı.");
+      setCourierFee(null);
+    } finally {
+      setCourierFeeLoading(false);
+    }
+  };
+
+  const handleLocationChange = (lat: number, lng: number) => {
+    setDeliveryLat(lat);
+    setDeliveryLng(lng);
+    fetchCourierFee(lat, lng);
+  };
 
   const fetchPaytrToken = async (orderId: string) => {
     setPaytrLoading(true);
@@ -330,21 +387,53 @@ export default function Home() {
   const submitOrder = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (cart.length === 0 || submitting) return;
+
+    if (orderType === "delivery") {
+      if (deliveryLat == null || deliveryLng == null) {
+        alert(
+          lang === "tr"
+            ? "Lütfen teslimat adresinizi haritadan seçin (öneri listesinden bir adres seçmeniz gerekiyor)."
+            : "Silakan pilih alamat pengiriman Anda dari peta (pilih salah satu saran alamat)."
+        );
+        return;
+      }
+      if (courierFeeLoading) {
+        alert(
+          lang === "tr"
+            ? "Kurye ücreti hesaplanıyor, lütfen birkaç saniye bekleyin."
+            : "Ongkos kirim sedang dihitung, mohon tunggu."
+        );
+        return;
+      }
+      if (courierFee == null) {
+        alert(
+          lang === "tr"
+            ? "Kurye ücreti hesaplanamadı. Lütfen adresi tekrar seçin."
+            : "Ongkos kirim gagal dihitung. Silakan pilih alamat lagi."
+        );
+        return;
+      }
+    }
+
     setSubmitting(true);
 
     try {
       const { data: orderData, error: orderError } = await supabase
         .from("orders")
         .insert({
-          source: "delivery",
+          source: orderType,
           customer_name: customerName,
           customer_phone: customerPhone,
           customer_email: customerEmail,
-          delivery_address: deliveryAddress || null,
+          delivery_address: orderType === "delivery" ? deliveryAddress || null : null,
+          delivery_lat: orderType === "delivery" ? deliveryLat : null,
+          delivery_lng: orderType === "delivery" ? deliveryLng : null,
+          delivery_distance_km: orderType === "delivery" ? courierDistanceKm : null,
+          courier_fee_tl: orderType === "delivery" ? courierFee : 0,
           delivery_date: deliveryDate || null,
           delivery_time: deliveryTime || null,
-          total_tl: cartTotal,
-          total_idr: cartTotalIDR,
+          total_tl: grandTotal,
+          total_idr: grandTotalIDR,
           sambal_requested: cart.some((line) => line.sambal),
           payment_status: "pending",
           order_status: "new",
@@ -390,8 +479,8 @@ export default function Home() {
 
       setOrderNumber(`ID-${orderData.order_number}`);
       setCompletedOrderId(orderData.id);
-      setCompletedTotalTL(cartTotal);
-      setCompletedTotalIDR(cartTotalIDR);
+      setCompletedTotalTL(grandTotal);
+      setCompletedTotalIDR(grandTotalIDR);
       setOrderComplete(true);
       setCart([]);
       fetchPaytrToken(orderData.id);
@@ -788,6 +877,12 @@ export default function Home() {
                     setPaytrToken(null);
                     setPaytrError(null);
                     setShowBankInfo(false);
+                    setDeliveryAddress("");
+                    setDeliveryLat(null);
+                    setDeliveryLng(null);
+                    setCourierFee(null);
+                    setCourierDistanceKm(null);
+                    setOrderType("delivery");
                   }}
                   className="w-full rounded-2xl border border-[#e4d3c1] px-5 py-3 text-sm font-black text-[#5b4032]"
                 >
@@ -899,6 +994,34 @@ export default function Home() {
                 )}
 
                 <div>
+                  <p className="mb-2 text-xs font-black uppercase tracking-wide text-[#806b5b]">
+                    {tr.orderTypeLabel}
+                  </p>
+                  <div className="grid grid-cols-3 gap-2">
+                    {(
+                      [
+                        ["delivery", tr.orderTypeDelivery],
+                        ["pickup", tr.orderTypePickup],
+                        ["dinein", tr.orderTypeDinein],
+                      ] as const
+                    ).map(([type, label]) => (
+                      <button
+                        key={type}
+                        type="button"
+                        onClick={() => setOrderType(type)}
+                        className={`rounded-2xl px-3 py-3 text-xs font-black transition ${
+                          orderType === type
+                            ? "bg-[#ef2b1e] text-white shadow-sm"
+                            : "border border-[#e5d4c2] bg-white text-[#5b4032]"
+                        }`}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
                   <h3 className="mb-3 text-lg font-black">{tr.customerInfo}</h3>
                   <div className="grid gap-3 sm:grid-cols-2">
                     <input
@@ -924,14 +1047,28 @@ export default function Home() {
                       placeholder={tr.email}
                       className="sm:col-span-2 rounded-2xl border border-[#e5d4c2] bg-white px-4 py-3 outline-none focus:border-[#ef2b1e]"
                     />
-                    <textarea
-                      required
-                      value={deliveryAddress}
-                      onChange={(event) => setDeliveryAddress(event.target.value)}
-                      placeholder={tr.address}
-                      rows={3}
-                      className="sm:col-span-2 rounded-2xl border border-[#e5d4c2] bg-white px-4 py-3 outline-none focus:border-[#ef2b1e]"
-                    />
+                    {orderType === "delivery" && (
+                      <div className="sm:col-span-2">
+                        <AddressPicker
+                          address={deliveryAddress}
+                          onAddressChange={setDeliveryAddress}
+                          onLocationChange={handleLocationChange}
+                          placeholder={tr.address}
+                          dragHint={tr.dragHint}
+                        />
+                        {courierFeeLoading && (
+                          <p className="mt-2 text-xs font-bold text-[#806b5b]">{tr.courierCalculating}</p>
+                        )}
+                        {courierFeeError && (
+                          <p className="mt-2 text-xs font-bold text-red-600">{courierFeeError}</p>
+                        )}
+                        {courierFee != null && !courierFeeLoading && (
+                          <p className="mt-2 text-xs font-bold text-green-700">
+                            🛵 {tr.courierFeeLabel}: {formatTL(courierFee)} ({courierDistanceKm} km)
+                          </p>
+                        )}
+                      </div>
+                    )}
 
                     <div className="sm:col-span-2">
                       <p className="mb-2 text-xs font-black uppercase tracking-wide text-[#806b5b]">
@@ -990,24 +1127,44 @@ export default function Home() {
                   </div>
                 </div>
 
+                <div className="rounded-2xl border border-[#e5d4c2] bg-white p-4 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-[#806b5b]">{tr.subtotalLabel}</span>
+                    <span className="font-bold">{formatTL(cartTotal)}</span>
+                  </div>
+                  {orderType === "delivery" && (
+                    <div className="mt-1 flex justify-between">
+                      <span className="text-[#806b5b]">{tr.courierFeeLabel}</span>
+                      <span className="font-bold">
+                        {courierFee != null ? formatTL(courierFee) : "—"}
+                      </span>
+                    </div>
+                  )}
+                </div>
+
                 <div className="grid gap-3 sm:grid-cols-2">
                   <div className="rounded-2xl border border-[#e5d4c2] bg-white p-4">
                     <div className="text-xs font-black uppercase tracking-wide text-[#806b5b]">
                       {tr.totalTL}
                     </div>
-                    <div className="mt-1 text-2xl font-black">{formatTL(cartTotal)}</div>
+                    <div className="mt-1 text-2xl font-black">{formatTL(grandTotal)}</div>
                   </div>
                   <div className="rounded-2xl border border-[#e5d4c2] bg-white p-4">
                     <div className="text-xs font-black uppercase tracking-wide text-[#806b5b]">
                       {tr.totalIDR}
                     </div>
-                    <div className="mt-1 text-2xl font-black">{formatIDR(cartTotalIDR)}</div>
+                    <div className="mt-1 text-2xl font-black">{formatIDR(grandTotalIDR)}</div>
                   </div>
                 </div>
 
                 <button
                   type="submit"
-                  disabled={cart.length === 0 || submitting}
+                  disabled={
+                    cart.length === 0 ||
+                    submitting ||
+                    (orderType === "delivery" &&
+                      (courierFeeLoading || deliveryLat == null || courierFee == null))
+                  }
                   className="w-full rounded-2xl bg-[#ef2b1e] px-5 py-4 text-sm font-black text-white shadow-lg transition hover:bg-[#d92318] disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {submitting ? tr.submitting : tr.finish}

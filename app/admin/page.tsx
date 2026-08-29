@@ -18,11 +18,15 @@ type OrderItemRow = {
 type OrderRow = {
   id: string;
   order_number: number;
-  source: "delivery" | "table";
+  source: "delivery" | "table" | "pickup" | "dinein";
   table_id: string | null;
   customer_name: string | null;
   customer_phone: string | null;
   delivery_address: string | null;
+  delivery_lat: number | null;
+  delivery_lng: number | null;
+  courier_fee_tl: number | null;
+  delivery_distance_km: number | null;
   total_tl: number;
   sambal_requested: boolean;
   order_status: string;
@@ -78,7 +82,7 @@ export default function AdminPage() {
     const { data, error } = await supabase
       .from("orders")
       .select(
-        "id, order_number, source, table_id, customer_name, customer_phone, delivery_address, total_tl, sambal_requested, order_status, payment_status, created_at, order_items(id, product_name_tr, quantity, unit_price_tl, item_note, options), restaurant_tables(table_number)"
+        "id, order_number, source, table_id, customer_name, customer_phone, delivery_address, delivery_lat, delivery_lng, courier_fee_tl, delivery_distance_km, total_tl, sambal_requested, order_status, payment_status, created_at, order_items(id, product_name_tr, quantity, unit_price_tl, item_note, options), restaurant_tables(table_number)"
       )
       .neq("order_status", "completed")
       .order("created_at", { ascending: false });
@@ -273,15 +277,42 @@ export default function AdminPage() {
                         <span className="text-xs font-bold text-[#7a6f63]">
                           {order.source === "delivery"
                             ? "🚚 Paket Sipariş"
-                            : `🍽️ Masa ${order.restaurant_tables?.table_number ?? "?"}`}
+                            : order.source === "pickup"
+                              ? "🏃 Gel Al"
+                              : order.source === "dinein"
+                                ? "🍽️ Restoranda Yiyor"
+                                : `🍽️ Masa ${order.restaurant_tables?.table_number ?? "?"}`}
                         </span>
                         <span className="text-xs text-[#a89d8e]">{timeAgo(order.created_at)}</span>
                       </div>
-                      {order.source === "delivery" && (
+                      {(order.source === "delivery" ||
+                        order.source === "pickup" ||
+                        order.source === "dinein") && (
                         <div className="mt-1 text-sm text-[#5b4032]">
                           <div className="font-bold">{order.customer_name}</div>
                           <div>{order.customer_phone}</div>
-                          <div className="text-xs text-[#7a6f63]">{order.delivery_address}</div>
+                          {order.source === "delivery" && (
+                            <>
+                              <div className="text-xs text-[#7a6f63]">{order.delivery_address}</div>
+                              {order.courier_fee_tl != null && (
+                                <div className="mt-1 text-xs font-bold text-[#a05a2c]">
+                                  🛵 Kurye: {order.courier_fee_tl.toLocaleString("tr-TR")} TL
+                                  {order.delivery_distance_km != null &&
+                                    ` (${order.delivery_distance_km} km)`}
+                                </div>
+                              )}
+                              {order.delivery_lat != null && order.delivery_lng != null && (
+                                <a
+                                  href={`https://www.google.com/maps?q=${order.delivery_lat},${order.delivery_lng}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="mt-1 inline-block text-xs font-bold text-blue-700 underline"
+                                >
+                                  📍 Haritada Gör
+                                </a>
+                              )}
+                            </>
+                          )}
                         </div>
                       )}
                       {order.source === "table" && order.delivery_address && (
