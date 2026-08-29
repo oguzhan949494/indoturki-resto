@@ -9,6 +9,8 @@ type Props = {
   onLocationChange: (lat: number, lng: number) => void;
   placeholder: string;
   dragHint: string;
+  initialLat?: number | null;
+  initialLng?: number | null;
 };
 
 export default function AddressPicker({
@@ -17,6 +19,8 @@ export default function AddressPicker({
   onLocationChange,
   placeholder,
   dragHint,
+  initialLat,
+  initialLng,
 }: Props) {
   const { loaded, error } = useGoogleMaps();
   const inputRef = useRef<HTMLInputElement>(null);
@@ -26,6 +30,17 @@ export default function AddressPicker({
   const [showMap, setShowMap] = useState(false);
   const [pinLat, setPinLat] = useState<number | null>(null);
   const [pinLng, setPinLng] = useState<number | null>(null);
+
+  // Düzenli müşteri telefonundan bulunan kayıtlı konum varsa, haritayı
+  // otomatik olarak o noktada açar (kullanıcı hiçbir şey yapmamış olsa bile).
+  useEffect(() => {
+    if (initialLat != null && initialLng != null && pinLat == null) {
+      setPinLat(initialLat);
+      setPinLng(initialLng);
+      setShowMap(true);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialLat, initialLng]);
 
   useEffect(() => {
     if (!loaded || !inputRef.current || !window.google) return;

@@ -86,8 +86,9 @@ export default function Home() {
   const [submitting, setSubmitting] = useState(false);
   const [customerName, setCustomerName] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
-  const [customerEmail, setCustomerEmail] = useState("");
   const [deliveryAddress, setDeliveryAddress] = useState("");
+  const [addressNote, setAddressNote] = useState("");
+  const [leaveAtReception, setLeaveAtReception] = useState(false);
   const [deliveryLat, setDeliveryLat] = useState<number | null>(null);
   const [deliveryLng, setDeliveryLng] = useState<number | null>(null);
   const [courierFee, setCourierFee] = useState<number | null>(null);
@@ -203,8 +204,16 @@ export default function Home() {
     orderTypePickup: lang === "tr" ? "🏃 Gel Al" : "🏃 Ambil Sendiri",
     orderTypeDinein: lang === "tr" ? "🍽️ Restoranda Yiyeceğim" : "🍽️ Makan di Tempat",
     name: lang === "tr" ? "Alıcı adı soyadı" : "Nama penerima",
-    phone: lang === "tr" ? "Telefon numarası" : "Nomor telepon",
-    email: lang === "tr" ? "E-posta adresi" : "Alamat email",
+    phone:
+      lang === "tr"
+        ? "Telefon numarası (Endonezya numarası da olabilir)"
+        : "Nomor telepon (nomor Indonesia juga bisa)",
+    addressNotePlaceholder:
+      lang === "tr"
+        ? "Daire no, işletme adı (otel/spa vb.) gibi detayları buraya yazabilirsiniz..."
+        : "Anda dapat menuliskan nomor apartemen, nama tempat (hotel/spa dll.) di sini...",
+    leaveAtReception:
+      lang === "tr" ? "Resepsiyona bırakabilirsiniz" : "Dapat dititipkan di resepsionis",
     address: lang === "tr" ? "Teslimat adresi" : "Alamat pengiriman",
     dragHint:
       lang === "tr"
@@ -357,6 +366,50 @@ export default function Home() {
     fetchCourierFee(lat, lng);
   };
 
+  // Telefon numarasını sadece rakamlara indirger (boşluk, tire, + işareti
+  // fark etmesin diye) — hem kayıt hem arama sırasında bunu kullanıyoruz,
+  // böylece "+62 812 345" ile "0812345" aynı numara olarak eşleşir.
+  const normalizePhone = (value: string) => value.replace(/\D/g, "");
+
+  // Telefon numarasından ayrılınca, o numarayla daha önce sipariş verilmiş mi
+  // diye bakar; varsa isim/adres/not bilgilerini otomatik doldurur. Mevcut
+  // yazılmış bir bilgiyi ASLA ezmez — sadece o alanlar boşsa doldurur.
+  const lookupReturningCustomer = async () => {
+    const phone = normalizePhone(customerPhone);
+    if (phone.length < 8) return;
+
+    const { data } = await supabase
+      .from("orders")
+      .select(
+        "customer_name, delivery_address, delivery_lat, delivery_lng, delivery_note, leave_at_reception"
+      )
+      .eq("customer_phone", phone)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (!data) return;
+
+    if (!customerName && data.customer_name) {
+      setCustomerName(data.customer_name);
+    }
+
+    if (
+      orderType === "delivery" &&
+      !deliveryAddress &&
+      data.delivery_address &&
+      data.delivery_lat != null &&
+      data.delivery_lng != null
+    ) {
+      setDeliveryAddress(data.delivery_address);
+      setDeliveryLat(data.delivery_lat);
+      setDeliveryLng(data.delivery_lng);
+      setAddressNote(data.delivery_note ?? "");
+      setLeaveAtReception(data.leave_at_reception ?? false);
+      fetchCourierFee(data.delivery_lat, data.delivery_lng);
+    }
+  };
+
   const fetchPaytrToken = async (orderId: string) => {
     setPaytrLoading(true);
     setPaytrError(null);
@@ -423,12 +476,13 @@ export default function Home() {
         .insert({
           source: orderType,
           customer_name: customerName,
-          customer_phone: customerPhone,
-          customer_email: customerEmail,
+          customer_phone: normalizePhone(customerPhone),
           delivery_address: orderType === "delivery" ? deliveryAddress || null : null,
           delivery_lat: orderType === "delivery" ? deliveryLat : null,
           delivery_lng: orderType === "delivery" ? deliveryLng : null,
           delivery_distance_km: orderType === "delivery" ? courierDistanceKm : null,
+          delivery_note: orderType === "delivery" ? addressNote.trim() || null : null,
+          leave_at_reception: orderType === "delivery" ? leaveAtReception : false,
           courier_fee_tl: orderType === "delivery" ? courierFee : 0,
           delivery_date: deliveryDate || null,
           delivery_time: deliveryTime || null,
@@ -882,6 +936,8 @@ export default function Home() {
                     setDeliveryLng(null);
                     setCourierFee(null);
                     setCourierDistanceKm(null);
+                    setAddressNote("");
+                    setLeaveAtReception(false);
                     setOrderType("delivery");
                   }}
                   className="w-full rounded-2xl border border-[#e4d3c1] px-5 py-3 text-sm font-black text-[#5b4032]"
@@ -1036,15 +1092,8 @@ export default function Home() {
                       type="tel"
                       value={customerPhone}
                       onChange={(event) => setCustomerPhone(event.target.value)}
+                      onBlur={lookupReturningCustomer}
                       placeholder={tr.phone}
-                      className="rounded-2xl border border-[#e5d4c2] bg-white px-4 py-3 outline-none focus:border-[#ef2b1e]"
-                    />
-                    <input
-                      required
-                      type="email"
-                      value={customerEmail}
-                      onChange={(event) => setCustomerEmail(event.target.value)}
-                      placeholder={tr.email}
                       className="sm:col-span-2 rounded-2xl border border-[#e5d4c2] bg-white px-4 py-3 outline-none focus:border-[#ef2b1e]"
                     />
                     {orderType === "delivery" && (
@@ -1055,6 +1104,8 @@ export default function Home() {
                           onLocationChange={handleLocationChange}
                           placeholder={tr.address}
                           dragHint={tr.dragHint}
+                          initialLat={deliveryLat}
+                          initialLng={deliveryLng}
                         />
                         {courierFeeLoading && (
                           <p className="mt-2 text-xs font-bold text-[#806b5b]">{tr.courierCalculating}</p>
@@ -1067,6 +1118,23 @@ export default function Home() {
                             🛵 {tr.courierFeeLabel}: {formatTL(courierFee)} ({courierDistanceKm} km)
                           </p>
                         )}
+
+                        <textarea
+                          value={addressNote}
+                          onChange={(event) => setAddressNote(event.target.value)}
+                          placeholder={tr.addressNotePlaceholder}
+                          rows={2}
+                          className="mt-3 w-full rounded-2xl border border-[#e5d4c2] bg-white px-4 py-3 text-sm outline-none focus:border-[#ef2b1e]"
+                        />
+                        <label className="mt-2 flex cursor-pointer items-center gap-2 text-xs font-bold text-[#5b4032]">
+                          <input
+                            type="checkbox"
+                            checked={leaveAtReception}
+                            onChange={(event) => setLeaveAtReception(event.target.checked)}
+                            className="h-4 w-4 accent-[#ef2b1e]"
+                          />
+                          🏨 {tr.leaveAtReception}
+                        </label>
                       </div>
                     )}
 

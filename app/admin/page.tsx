@@ -23,6 +23,8 @@ type OrderRow = {
   customer_name: string | null;
   customer_phone: string | null;
   delivery_address: string | null;
+  delivery_note: string | null;
+  leave_at_reception: boolean;
   delivery_lat: number | null;
   delivery_lng: number | null;
   courier_fee_tl: number | null;
@@ -82,7 +84,7 @@ export default function AdminPage() {
     const { data, error } = await supabase
       .from("orders")
       .select(
-        "id, order_number, source, table_id, customer_name, customer_phone, delivery_address, delivery_lat, delivery_lng, courier_fee_tl, delivery_distance_km, total_tl, sambal_requested, order_status, payment_status, created_at, order_items(id, product_name_tr, quantity, unit_price_tl, item_note, options), restaurant_tables(table_number)"
+        "id, order_number, source, table_id, customer_name, customer_phone, delivery_address, delivery_lat, delivery_lng, delivery_note, leave_at_reception, courier_fee_tl, delivery_distance_km, total_tl, sambal_requested, order_status, payment_status, created_at, order_items(id, product_name_tr, quantity, unit_price_tl, item_note, options), restaurant_tables(table_number)"
       )
       .neq("order_status", "completed")
       .order("created_at", { ascending: false });
@@ -294,6 +296,16 @@ export default function AdminPage() {
                           {order.source === "delivery" && (
                             <>
                               <div className="text-xs text-[#7a6f63]">{order.delivery_address}</div>
+                              {order.leave_at_reception && (
+                                <div className="mt-1 inline-block rounded-full bg-blue-50 px-2 py-0.5 text-[11px] font-bold text-blue-800">
+                                  🏨 Resepsiyona bırakılacak
+                                </div>
+                              )}
+                              {order.delivery_note && (
+                                <div className="mt-1 rounded-lg bg-amber-50 px-2 py-1 text-xs italic text-amber-800">
+                                  📝 {order.delivery_note}
+                                </div>
+                              )}
                               {order.courier_fee_tl != null && (
                                 <div className="mt-1 text-xs font-bold text-[#a05a2c]">
                                   🛵 Kurye: {order.courier_fee_tl.toLocaleString("tr-TR")} TL
