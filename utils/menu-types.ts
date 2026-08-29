@@ -47,6 +47,9 @@ export type CartLine = {
   product: Product;
   quantity: number;
   note: string;
+  sambal: boolean;
+  extraPilav: boolean;
+  extraNoodle: boolean;
 };
 
 export const ALL_CATEGORY_ID = "__all__";
@@ -90,3 +93,41 @@ export const formatIDR = (value: number) =>
 export function generateOrderNumber() {
   return Math.floor(100000 + Math.random() * 900000);
 }
+
+// --- Ürün başına ek seçenekler (sambal, ekstra pilav, ekstra noodle) ---
+
+export const EXTRA_ADDON_PRICE = 50;
+
+// Kategori adına bakarak "rice bowl" mi "noodle" mü olduğunu anlar.
+// Kategori isimlerinde İngilizce "Bowl" / "Noodle" kelimeleri geçtiği için
+// bu basit kontrol yeterli (bkz. seed.sql'deki kategori adları).
+export function categoryAllowsExtraPilav(categoryNameTr: string) {
+  return categoryNameTr.toLowerCase().includes("bowl");
+}
+
+export function categoryAllowsExtraNoodle(categoryNameTr: string) {
+  return categoryNameTr.toLowerCase().includes("noodle");
+}
+
+// Bir sepet satırının, seçilen eklentilerle birlikte birim fiyatı.
+export function lineUnitPrice(line: CartLine): number {
+  let price = line.product.price;
+  if (line.extraPilav) price += EXTRA_ADDON_PRICE;
+  if (line.extraNoodle) price += EXTRA_ADDON_PRICE;
+  return price;
+}
+
+// Sipariş kaydedilirken order_items.options alanına yazılacak kodlar.
+export function lineOptionCodes(line: CartLine): string[] {
+  const codes: string[] = [];
+  if (line.sambal) codes.push("sambal");
+  if (line.extraPilav) codes.push("extra_pilav");
+  if (line.extraNoodle) codes.push("extra_noodle");
+  return codes;
+}
+
+export const OPTION_LABELS: Record<string, { tr: string; id: string }> = {
+  sambal: { tr: "🌶️ Sambal sos", id: "🌶️ Sambal" },
+  extra_pilav: { tr: "🍚 Ekstra Pilav (150g) +50₺", id: "🍚 Tambah Nasi (150g) +50₺" },
+  extra_noodle: { tr: "🍜 Ekstra Noodle (75g) +50₺", id: "🍜 Tambah Mie (75g) +50₺" },
+};

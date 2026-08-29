@@ -5,8 +5,12 @@ import type { FormEvent } from "react";
 import { createClient } from "@/utils/supabase/client";
 import {
   ALL_CATEGORY_ID,
+  categoryAllowsExtraNoodle,
+  categoryAllowsExtraPilav,
   formatIDR,
   formatTL,
+  lineOptionCodes,
+  lineUnitPrice,
   mapCategories,
   mapProducts,
   type CartLine,
@@ -74,7 +78,6 @@ export default function Home() {
   const [activeCategory, setActiveCategory] = useState<string>(ALL_CATEGORY_ID);
   const [search, setSearch] = useState("");
   const [cart, setCart] = useState<CartLine[]>([]);
-  const [sambal, setSambal] = useState(true);
   const [lang, setLang] = useState<"tr" | "id">("tr");
   const [checkoutOpen, setCheckoutOpen] = useState(false);
   const [orderComplete, setOrderComplete] = useState(false);
@@ -150,9 +153,11 @@ export default function Home() {
     add: lang === "tr" ? "Sepete Ekle" : "Tambah ke keranjang",
     sambalInfo:
       lang === "tr"
-        ? "Paket siparişlerinde ücretsiz verilir. İstemiyorsanız kaldırabilirsiniz."
-        : "Gratis untuk pesanan takeaway. Jika tidak ingin, Anda dapat menghapusnya.",
+        ? "Ücretsizdir. Sepetteki her ürün için ayrı ayrı seçebilirsiniz."
+        : "Gratis. Anda dapat memilihnya secara terpisah untuk setiap produk di keranjang.",
     wantSambal: lang === "tr" ? "Sambal sos istiyorum" : "Saya ingin sambal",
+    extraPilav: lang === "tr" ? "Ekstra Pilav (150g) +50₺" : "Tambah Nasi (150g) +50₺",
+    extraNoodle: lang === "tr" ? "Ekstra Noodle (75g) +50₺" : "Tambah Mie (75g) +50₺",
     traditionalDishes:
       lang === "tr" ? "Geleneksel Endonezya Yemekleri" : "Hidangan Tradisional Indonesia",
     heroTitle: lang === "tr" ? "Endonezya mutfağının" : "Cita rasa asli masakan",
@@ -244,7 +249,10 @@ export default function Home() {
             : line
         );
       }
-      return [...current, { product, quantity: 1, note: "" }];
+      return [
+        ...current,
+        { product, quantity: 1, note: "", sambal: true, extraPilav: false, extraNoodle: false },
+      ];
     });
   };
 
@@ -260,17 +268,20 @@ export default function Home() {
     );
   };
 
-  const updateNote = (productId: string, note: string) => {
+  const updateCartLine = (productId: string, patch: Partial<CartLine>) => {
     setCart((current) =>
       current.map((line) =>
-        line.product.id === productId ? { ...line, note } : line
+        line.product.id === productId ? { ...line, ...patch } : line
       )
     );
   };
 
+  const categoryNameForProduct = (product: Product) =>
+    categories.find((c) => c.id === product.categoryId)?.nameTr ?? "";
+
   const cartCount = cart.reduce((sum, line) => sum + line.quantity, 0);
   const cartTotal = cart.reduce(
-    (sum, line) => sum + line.product.price * line.quantity,
+    (sum, line) => sum + lineUnitPrice(line) * line.quantity,
     0
   );
   const cartTotalIDR = cartTotal * idrRate;
@@ -292,7 +303,7 @@ export default function Home() {
           delivery_time: deliveryTime || null,
           total_tl: cartTotal,
           total_idr: cartTotalIDR,
-          sambal_requested: sambal,
+          sambal_requested: cart.some((line) => line.sambal),
           payment_status: "pending",
           order_status: "new",
         })
@@ -315,9 +326,9 @@ export default function Home() {
         product_name_tr: line.product.nameTr,
         product_name_id: line.product.nameId,
         quantity: line.quantity,
-        unit_price_tl: line.product.price,
-        unit_price_idr: line.product.price * idrRate,
-        options: [],
+        unit_price_tl: lineUnitPrice(line),
+        unit_price_idr: lineUnitPrice(line) * idrRate,
+        options: lineOptionCodes(line),
         item_note: line.note?.trim() || null,
       }));
 
@@ -479,15 +490,6 @@ export default function Home() {
               <p className="mt-1 text-xs leading-5 text-[#745d4e]">{tr.sambalInfo}</p>
             </div>
           </div>
-          <label className="mt-3 flex cursor-pointer items-center gap-2 text-xs font-bold">
-            <input
-              type="checkbox"
-              checked={sambal}
-              onChange={(event) => setSambal(event.target.checked)}
-              className="h-4 w-4 accent-[#ef2b1e]"
-            />
-            {tr.wantSambal}
-          </label>
         </div>
       </section>
 
@@ -699,61 +701,101 @@ export default function Home() {
                   </p>
                 ) : (
                   <div className="space-y-3">
-                    {cart.map((line) => (
-                      <div
-                        key={line.product.id}
-                        className="rounded-2xl border border-[#e5d4c2] bg-white p-3"
-                      >
-                        <div className="flex items-center justify-between gap-3">
-                          <div className="min-w-0">
-                            <div className="font-black">{productName(line.product)}</div>
-                            <div className="text-sm text-[#806b5b]">
-                              {formatTL(line.product.price)} × {line.quantity}
+                    {cart.map((line) => {
+                      const categoryName = categoryNameForProduct(line.product);
+                      const showPilavOption = categoryAllowsExtraPilav(categoryName);
+                      const showNoodleOption = categoryAllowsExtraNoodle(categoryName);
+                      return (
+                        <div
+                          key={line.product.id}
+                          className="rounded-2xl border border-[#e5d4c2] bg-white p-3"
+                        >
+                          <div className="flex items-center justify-between gap-3">
+                            <div className="min-w-0">
+                              <div className="font-black">{productName(line.product)}</div>
+                              <div className="text-sm text-[#806b5b]">
+                                {formatTL(lineUnitPrice(line))} × {line.quantity}
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <button
+                                type="button"
+                                onClick={() => changeQuantity(line.product.id, -1)}
+                                aria-label={tr.decrease}
+                                className="h-9 w-9 rounded-full border border-[#e5d4c2] font-black"
+                              >
+                                −
+                              </button>
+                              <span className="w-6 text-center font-black">{line.quantity}</span>
+                              <button
+                                type="button"
+                                onClick={() => changeQuantity(line.product.id, 1)}
+                                aria-label={tr.increase}
+                                className="h-9 w-9 rounded-full border border-[#e5d4c2] font-black"
+                              >
+                                +
+                              </button>
                             </div>
                           </div>
-                          <div className="flex items-center gap-2">
-                            <button
-                              type="button"
-                              onClick={() => changeQuantity(line.product.id, -1)}
-                              aria-label={tr.decrease}
-                              className="h-9 w-9 rounded-full border border-[#e5d4c2] font-black"
-                            >
-                              −
-                            </button>
-                            <span className="w-6 text-center font-black">{line.quantity}</span>
-                            <button
-                              type="button"
-                              onClick={() => changeQuantity(line.product.id, 1)}
-                              aria-label={tr.increase}
-                              className="h-9 w-9 rounded-full border border-[#e5d4c2] font-black"
-                            >
-                              +
-                            </button>
+
+                          <div className="mt-2 space-y-1.5">
+                            <label className="flex cursor-pointer items-center gap-2 text-xs font-bold">
+                              <input
+                                type="checkbox"
+                                checked={line.sambal}
+                                onChange={(event) =>
+                                  updateCartLine(line.product.id, { sambal: event.target.checked })
+                                }
+                                className="h-4 w-4 accent-[#ef2b1e]"
+                              />
+                              🌶️ {tr.wantSambal}
+                            </label>
+                            {showPilavOption && (
+                              <label className="flex cursor-pointer items-center gap-2 text-xs font-bold">
+                                <input
+                                  type="checkbox"
+                                  checked={line.extraPilav}
+                                  onChange={(event) =>
+                                    updateCartLine(line.product.id, {
+                                      extraPilav: event.target.checked,
+                                    })
+                                  }
+                                  className="h-4 w-4 accent-[#ef2b1e]"
+                                />
+                                🍚 {tr.extraPilav}
+                              </label>
+                            )}
+                            {showNoodleOption && (
+                              <label className="flex cursor-pointer items-center gap-2 text-xs font-bold">
+                                <input
+                                  type="checkbox"
+                                  checked={line.extraNoodle}
+                                  onChange={(event) =>
+                                    updateCartLine(line.product.id, {
+                                      extraNoodle: event.target.checked,
+                                    })
+                                  }
+                                  className="h-4 w-4 accent-[#ef2b1e]"
+                                />
+                                🍜 {tr.extraNoodle}
+                              </label>
+                            )}
                           </div>
+
+                          <input
+                            value={line.note}
+                            onChange={(event) =>
+                              updateCartLine(line.product.id, { note: event.target.value })
+                            }
+                            placeholder={tr.itemNotePlaceholder}
+                            maxLength={200}
+                            className="mt-2 w-full rounded-xl border border-[#eee1d4] bg-[#fffaf4] px-3 py-2 text-xs outline-none focus:border-[#ef2b1e]"
+                          />
                         </div>
-                        <input
-                          value={line.note}
-                          onChange={(event) => updateNote(line.product.id, event.target.value)}
-                          placeholder={tr.itemNotePlaceholder}
-                          maxLength={200}
-                          className="mt-2 w-full rounded-xl border border-[#eee1d4] bg-[#fffaf4] px-3 py-2 text-xs outline-none focus:border-[#ef2b1e]"
-                        />
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
-
-                <div className="rounded-2xl bg-[#f8efe6] p-4">
-                  <label className="flex items-center gap-3 text-sm font-bold">
-                    <input
-                      type="checkbox"
-                      checked={sambal}
-                      onChange={(event) => setSambal(event.target.checked)}
-                      className="h-5 w-5 accent-[#ef2b1e]"
-                    />
-                    🌶️ {tr.wantSambal}
-                  </label>
-                </div>
 
                 <div>
                   <h3 className="mb-3 text-lg font-black">{tr.customerInfo}</h3>

@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/utils/supabase/client";
+import { OPTION_LABELS } from "@/utils/menu-types";
 
 type OrderItemRow = {
   id: string;
@@ -11,6 +12,7 @@ type OrderItemRow = {
   quantity: number;
   unit_price_tl: number;
   item_note: string | null;
+  options: string[] | null;
 };
 
 type OrderRow = {
@@ -76,7 +78,7 @@ export default function AdminPage() {
     const { data, error } = await supabase
       .from("orders")
       .select(
-        "id, order_number, source, table_id, customer_name, customer_phone, delivery_address, total_tl, sambal_requested, order_status, payment_status, created_at, order_items(id, product_name_tr, quantity, unit_price_tl, item_note), restaurant_tables(table_number)"
+        "id, order_number, source, table_id, customer_name, customer_phone, delivery_address, total_tl, sambal_requested, order_status, payment_status, created_at, order_items(id, product_name_tr, quantity, unit_price_tl, item_note, options), restaurant_tables(table_number)"
       )
       .neq("order_status", "completed")
       .order("created_at", { ascending: false });
@@ -313,6 +315,18 @@ export default function AdminPage() {
                             {(item.unit_price_tl * item.quantity).toLocaleString("tr-TR")} TL
                           </span>
                         </div>
+                        {item.options && item.options.length > 0 && (
+                          <div className="mt-0.5 flex flex-wrap gap-1">
+                            {item.options.map((code) => (
+                              <span
+                                key={code}
+                                className="rounded-lg bg-orange-50 px-2 py-0.5 text-[11px] font-bold text-orange-800"
+                              >
+                                {OPTION_LABELS[code]?.tr ?? code}
+                              </span>
+                            ))}
+                          </div>
+                        )}
                         {item.item_note && (
                           <div className="mt-0.5 rounded-lg bg-amber-50 px-2 py-1 text-xs italic text-amber-800">
                             📝 {item.item_note}
@@ -320,9 +334,6 @@ export default function AdminPage() {
                         )}
                       </div>
                     ))}
-                    {order.sambal_requested && (
-                      <div className="text-xs text-[#a05a2c]">🌶️ Sambal isteniyor</div>
-                    )}
                   </div>
 
                   <div className="mt-4 flex flex-wrap items-center gap-2">

@@ -6,7 +6,11 @@ import { useSearchParams } from "next/navigation";
 import { createClient } from "@/utils/supabase/client";
 import {
   ALL_CATEGORY_ID,
+  categoryAllowsExtraNoodle,
+  categoryAllowsExtraPilav,
   formatTL,
+  lineOptionCodes,
+  lineUnitPrice,
   mapCategories,
   mapProducts,
   type CartLine,
@@ -46,7 +50,6 @@ function TableMenu() {
   const [activeCategory, setActiveCategory] = useState<string>(ALL_CATEGORY_ID);
   const [search, setSearch] = useState("");
   const [cart, setCart] = useState<CartLine[]>([]);
-  const [sambal, setSambal] = useState(true);
   const [checkoutOpen, setCheckoutOpen] = useState(false);
   const [orderComplete, setOrderComplete] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -104,6 +107,8 @@ function TableMenu() {
     tableLabel: lang === "tr" ? "Masa" : "Meja",
     add: lang === "tr" ? "Sepete Ekle" : "Tambah ke keranjang",
     wantSambal: lang === "tr" ? "Sambal sos istiyorum" : "Saya ingin sambal",
+    extraPilav: lang === "tr" ? "Ekstra Pilav (150g) +50₺" : "Tambah Nasi (150g) +50₺",
+    extraNoodle: lang === "tr" ? "Ekstra Noodle (75g) +50₺" : "Tambah Mie (75g) +50₺",
     sambalTitle: lang === "tr" ? "Ücretsiz Sambal Sos" : "Sambal Gratis",
     noProduct: lang === "tr" ? "Ürün bulunamadı." : "Produk tidak ditemukan.",
     showMenu: lang === "tr" ? "Menüyü göster" : "Tampilkan menu",
@@ -160,7 +165,10 @@ function TableMenu() {
           line.product.id === product.id ? { ...line, quantity: line.quantity + 1 } : line
         );
       }
-      return [...current, { product, quantity: 1, note: "" }];
+      return [
+        ...current,
+        { product, quantity: 1, note: "", sambal: true, extraPilav: false, extraNoodle: false },
+      ];
     });
   };
 
@@ -176,8 +184,22 @@ function TableMenu() {
     );
   };
 
+  const updateCartLine = (productId: string, patch: Partial<CartLine>) => {
+    setCart((current) =>
+      current.map((line) =>
+        line.product.id === productId ? { ...line, ...patch } : line
+      )
+    );
+  };
+
+  const categoryNameForProduct = (product: Product) =>
+    categories.find((c) => c.id === product.categoryId)?.nameTr ?? "";
+
   const cartCount = cart.reduce((sum, line) => sum + line.quantity, 0);
-  const cartTotal = cart.reduce((sum, line) => sum + line.product.price * line.quantity, 0);
+  const cartTotal = cart.reduce(
+    (sum, line) => sum + lineUnitPrice(line) * line.quantity,
+    0
+  );
 
   const submitOrder = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -192,7 +214,7 @@ function TableMenu() {
           table_id: tableId,
           total_tl: cartTotal,
           total_idr: 0,
-          sambal_requested: sambal,
+          sambal_requested: cart.some((line) => line.sambal),
           payment_status: "pending",
           order_status: "new",
           delivery_address: note || null,
@@ -212,10 +234,10 @@ function TableMenu() {
         product_name_tr: line.product.nameTr,
         product_name_id: line.product.nameId,
         quantity: line.quantity,
-        unit_price_tl: line.product.price,
+        unit_price_tl: lineUnitPrice(line),
         unit_price_idr: 0,
-        options: [],
-        item_note: null,
+        options: lineOptionCodes(line),
+        item_note: line.note?.trim() || null,
       }));
 
       const { error: itemsError } = await supabase.from("order_items").insert(orderItems);
@@ -364,15 +386,6 @@ function TableMenu() {
               <div className="text-sm font-black">{tr.sambalTitle}</div>
             </div>
           </div>
-          <label className="mt-3 flex cursor-pointer items-center gap-2 text-xs font-bold">
-            <input
-              type="checkbox"
-              checked={sambal}
-              onChange={(event) => setSambal(event.target.checked)}
-              className="h-4 w-4 accent-[#ef2b1e]"
-            />
-            {tr.wantSambal}
-          </label>
         </div>
       </section>
 
@@ -537,36 +550,87 @@ function TableMenu() {
                   </p>
                 ) : (
                   <div className="space-y-3">
-                    {cart.map((line) => (
-                      <div
-                        key={line.product.id}
-                        className="flex items-center justify-between gap-3 rounded-2xl border border-[#e5d4c2] bg-white p-3"
-                      >
-                        <div className="min-w-0">
-                          <div className="font-black">{productName(line.product)}</div>
-                          <div className="text-sm text-[#806b5b]">
-                            {formatTL(line.product.price)} × {line.quantity}
+                    {cart.map((line) => {
+                      const categoryName = categoryNameForProduct(line.product);
+                      const showPilavOption = categoryAllowsExtraPilav(categoryName);
+                      const showNoodleOption = categoryAllowsExtraNoodle(categoryName);
+                      return (
+                        <div
+                          key={line.product.id}
+                          className="rounded-2xl border border-[#e5d4c2] bg-white p-3"
+                        >
+                          <div className="flex items-center justify-between gap-3">
+                            <div className="min-w-0">
+                              <div className="font-black">{productName(line.product)}</div>
+                              <div className="text-sm text-[#806b5b]">
+                                {formatTL(lineUnitPrice(line))} × {line.quantity}
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <button
+                                type="button"
+                                onClick={() => changeQuantity(line.product.id, -1)}
+                                className="h-9 w-9 rounded-full border border-[#e5d4c2] font-black"
+                              >
+                                −
+                              </button>
+                              <span className="w-6 text-center font-black">{line.quantity}</span>
+                              <button
+                                type="button"
+                                onClick={() => changeQuantity(line.product.id, 1)}
+                                className="h-9 w-9 rounded-full border border-[#e5d4c2] font-black"
+                              >
+                                +
+                              </button>
+                            </div>
+                          </div>
+
+                          <div className="mt-2 space-y-1.5">
+                            <label className="flex cursor-pointer items-center gap-2 text-xs font-bold">
+                              <input
+                                type="checkbox"
+                                checked={line.sambal}
+                                onChange={(event) =>
+                                  updateCartLine(line.product.id, { sambal: event.target.checked })
+                                }
+                                className="h-4 w-4 accent-[#ef2b1e]"
+                              />
+                              🌶️ {tr.wantSambal}
+                            </label>
+                            {showPilavOption && (
+                              <label className="flex cursor-pointer items-center gap-2 text-xs font-bold">
+                                <input
+                                  type="checkbox"
+                                  checked={line.extraPilav}
+                                  onChange={(event) =>
+                                    updateCartLine(line.product.id, {
+                                      extraPilav: event.target.checked,
+                                    })
+                                  }
+                                  className="h-4 w-4 accent-[#ef2b1e]"
+                                />
+                                🍚 {tr.extraPilav}
+                              </label>
+                            )}
+                            {showNoodleOption && (
+                              <label className="flex cursor-pointer items-center gap-2 text-xs font-bold">
+                                <input
+                                  type="checkbox"
+                                  checked={line.extraNoodle}
+                                  onChange={(event) =>
+                                    updateCartLine(line.product.id, {
+                                      extraNoodle: event.target.checked,
+                                    })
+                                  }
+                                  className="h-4 w-4 accent-[#ef2b1e]"
+                                />
+                                🍜 {tr.extraNoodle}
+                              </label>
+                            )}
                           </div>
                         </div>
-                        <div className="flex items-center gap-2">
-                          <button
-                            type="button"
-                            onClick={() => changeQuantity(line.product.id, -1)}
-                            className="h-9 w-9 rounded-full border border-[#e5d4c2] font-black"
-                          >
-                            −
-                          </button>
-                          <span className="w-6 text-center font-black">{line.quantity}</span>
-                          <button
-                            type="button"
-                            onClick={() => changeQuantity(line.product.id, 1)}
-                            className="h-9 w-9 rounded-full border border-[#e5d4c2] font-black"
-                          >
-                            +
-                          </button>
-                        </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
 
