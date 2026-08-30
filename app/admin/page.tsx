@@ -302,6 +302,12 @@ export default function AdminPage() {
           </div>
           <div className="flex items-center gap-2">
             <Link
+              href="/admin/masalar"
+              className="rounded-full border border-[#e2ddd3] px-4 py-2 text-xs font-bold text-[#5b4032]"
+            >
+              🍽️ Masa Takip
+            </Link>
+            <Link
               href="/admin/products"
               className="rounded-full border border-[#e2ddd3] px-4 py-2 text-xs font-bold text-[#5b4032]"
             >

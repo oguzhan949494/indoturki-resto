@@ -46,6 +46,7 @@ function TableMenu() {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [tableId, setTableId] = useState<string | null>(null);
+  const [tableSessionId, setTableSessionId] = useState<string | null>(null);
   const [tableError, setTableError] = useState(false);
 
   const [activeCategory, setActiveCategory] = useState<string>(ALL_CATEGORY_ID);
@@ -76,6 +77,29 @@ function TableMenu() {
           setTableError(true);
         } else {
           setTableId(tableRow.id as string);
+
+          // Bu masanın açık bir oturumu var mı bak; yoksa yeni bir tane aç.
+          // Personel "Masayı Sıfırla" demedikçe, bu masadan gelen tüm
+          // siparişler aynı oturuma bağlanmaya devam eder.
+          const { data: existingSession } = await supabase
+            .from("table_sessions")
+            .select("id")
+            .eq("table_id", tableRow.id)
+            .eq("status", "open")
+            .order("opened_at", { ascending: false })
+            .limit(1)
+            .maybeSingle();
+
+          if (existingSession?.id) {
+            setTableSessionId(existingSession.id as string);
+          } else {
+            const { data: newSession } = await supabase
+              .from("table_sessions")
+              .insert({ table_id: tableRow.id, status: "open" })
+              .select("id")
+              .single();
+            if (newSession?.id) setTableSessionId(newSession.id as string);
+          }
         }
       } else {
         setTableError(true);
@@ -216,6 +240,7 @@ function TableMenu() {
         .insert({
           source: "table",
           table_id: tableId,
+          table_session_id: tableSessionId,
           total_tl: cartTotal,
           total_idr: 0,
           sambal_requested: cart.some((line) => line.sambal),
