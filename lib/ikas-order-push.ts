@@ -98,6 +98,14 @@ export async function pushOrderToIkas(orderId: string): Promise<void> {
 
   const totalAmount = orderLineItems.reduce((sum, line) => sum + line.price * line.quantity, 0);
 
+  const { data: settings } = await supabase
+    .from("restaurant_settings")
+    .select("ikas_default_sales_channel_id")
+    .limit(1)
+    .maybeSingle();
+
+  const salesChannelId = (settings as any)?.ikas_default_sales_channel_id || undefined;
+
   const variables = {
     input: {
       order: {
@@ -105,6 +113,7 @@ export async function pushOrderToIkas(orderId: string): Promise<void> {
         customer: {
           firstName: order.customer_name || "Müşteri",
         },
+        salesChannelId,
         note: `Indoturki Resto sipariş no: ID-${order.order_number} — Tel: ${
           order.customer_phone || "-"
         }${order.delivery_address ? " — " + order.delivery_address : ""}`,

@@ -26,6 +26,7 @@ const LIST_PRODUCT_QUERY = `
         id
         name
         description
+        salesChannelIds
         categories {
           id
           name
@@ -177,6 +178,28 @@ async function runSync() {
 
       if (upsertError) {
         throw new Error("Ürünler kaydedilemedi: " + upsertError.message);
+      }
+    }
+
+    // İlk bulunan geçerli sales channel ID'sini bir kere kaydediyoruz —
+    // sipariş oluştururken ikas'a hangi kanalı kullanacağımızı AÇIKÇA
+    // söylememiz gerekiyor (yoksa "Stock location not found" hatası alıyoruz).
+    const firstSalesChannelId = allIkasProducts.find(
+      (p) => Array.isArray(p.salesChannelIds) && p.salesChannelIds.length > 0
+    )?.salesChannelIds?.[0];
+
+    if (firstSalesChannelId) {
+      const { data: settingsRow } = await supabase
+        .from("restaurant_settings")
+        .select("id, ikas_default_sales_channel_id")
+        .limit(1)
+        .maybeSingle();
+
+      if (settingsRow && !settingsRow.ikas_default_sales_channel_id) {
+        await supabase
+          .from("restaurant_settings")
+          .update({ ikas_default_sales_channel_id: firstSalesChannelId })
+          .eq("id", settingsRow.id);
       }
     }
 
