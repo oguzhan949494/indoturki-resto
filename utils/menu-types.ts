@@ -21,6 +21,7 @@ export type DbProduct = {
   sort_order: number;
   image_url: string | null;
   section: string | null;
+  stock_quantity: number | null;
 };
 
 export type Category = {
@@ -45,6 +46,7 @@ export type Product = {
   imageUrl: string | null;
   isAvailable: boolean;
   section: "menu" | "market";
+  stockQuantity: number | null;
 };
 
 export type CartLine = {
@@ -83,6 +85,7 @@ export function mapProducts(rows: DbProduct[] | null): Product[] {
     imageUrl: row.image_url ?? null,
     isAvailable: row.is_available ?? true,
     section: row.section === "market" ? "market" : "menu",
+    stockQuantity: row.stock_quantity ?? null,
   }));
 }
 

@@ -293,15 +293,36 @@ export default function Home() {
     [categories, menuSection]
   );
 
+  // Market ürünlerinde (ikas'tan gelen), stokta olan miktardan fazlası
+  // sepete eklenemez. Yemek ürünlerinde (menu section) stok takibi yok,
+  // sınırsız.
+  const maxQtyFor = (product: Product) =>
+    product.section === "market" && product.stockQuantity != null
+      ? product.stockQuantity
+      : Infinity;
+
   const addToCart = (product: Product) => {
     setCart((current) => {
       const existing = current.find((line) => line.product.id === product.id);
+      const maxQty = maxQtyFor(product);
       if (existing) {
+        if (existing.quantity >= maxQty) {
+          alert(
+            lang === "tr"
+              ? `Stokta sadece ${maxQty} adet var.`
+              : `Stok tersedia hanya ${maxQty}.`
+          );
+          return current;
+        }
         return current.map((line) =>
           line.product.id === product.id
             ? { ...line, quantity: line.quantity + 1 }
             : line
         );
+      }
+      if (maxQty < 1) {
+        alert(lang === "tr" ? "Bu ürün stokta yok." : "Produk ini habis.");
+        return current;
       }
       return [
         ...current,
@@ -313,11 +334,12 @@ export default function Home() {
   const changeQuantity = (productId: string, delta: number) => {
     setCart((current) =>
       current
-        .map((line) =>
-          line.product.id === productId
-            ? { ...line, quantity: Math.max(0, line.quantity + delta) }
-            : line
-        )
+        .map((line) => {
+          if (line.product.id !== productId) return line;
+          const maxQty = maxQtyFor(line.product);
+          const nextQty = Math.min(Math.max(0, line.quantity + delta), maxQty);
+          return { ...line, quantity: nextQty };
+        })
         .filter((line) => line.quantity > 0)
     );
   };
@@ -775,6 +797,13 @@ export default function Home() {
                       <p className="mt-2 min-h-10 text-xs leading-5 text-[#806b5b]">
                         {productDescription(product)}
                       </p>
+                      {product.section === "market" && product.stockQuantity != null && (
+                        <p className="mt-1 text-[11px] font-bold text-[#a05a2c]">
+                          {lang === "tr"
+                            ? `Stokta ${product.stockQuantity} adet`
+                            : `Stok tersedia: ${product.stockQuantity}`}
+                        </p>
+                      )}
                     </div>
                     <div className="shrink-0 rounded-full border border-[#d9c2ae] bg-white px-3 py-1.5 text-sm font-black">
                       {formatTL(product.price)}

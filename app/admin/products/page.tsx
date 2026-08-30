@@ -47,7 +47,9 @@ export default function ProductImagesPage() {
         setSyncResult(`❌ ${data.error || "Senkronizasyon başarısız oldu."}`);
         return;
       }
-      setSyncResult(`✅ ${data.totalSynced} market ürünü güncellendi.`);
+      setSyncResult(
+        `✅ ${data.totalSynced} market ürünü güncellendi.\n\n🔍 Görsel teşhis verisi (bunu Claude'a yapıştır):\n${data.debugImageSample}`
+      );
       loadData();
     } catch {
       setSyncResult("❌ Senkronizasyon başarısız oldu.");
@@ -182,7 +184,9 @@ export default function ProductImagesPage() {
           </div>
         </div>
         {syncResult && (
-          <p className="mx-auto mt-2 max-w-5xl text-xs font-bold text-[#5b4032]">{syncResult}</p>
+          <p className="mx-auto mt-2 max-w-5xl whitespace-pre-wrap break-all rounded-xl bg-[#f8f4ee] p-3 text-xs font-bold text-[#5b4032]">
+            {syncResult}
+          </p>
         )}
       </header>
 
