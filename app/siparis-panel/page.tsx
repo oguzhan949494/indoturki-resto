@@ -140,10 +140,10 @@ export default function SiparisPanelPage() {
     siparisleriGetir();
   }
 
-  // Yazdırma sırasında 3'erli gruplara böl (A4 dikey sayfaya 3 fiş yan yana)
+  // Yazdırma sırasında 2'şerli gruplara böl (A4 dikey sayfa, kesim için 2 fiş yan yana)
   function sayfalaraBol(liste: Siparis[]): Siparis[][] {
     const sayfalar: Siparis[][] = [];
-    for (let i = 0; i < liste.length; i += 3) {
+    for (let i = 0; i < liste.length; i += 2) {
       sayfalar.push(liste.slice(i, i + 3));
     }
     return sayfalar;
@@ -237,7 +237,7 @@ export default function SiparisPanelPage() {
             @media print {
               #yazdirma-tekli {
                 display: block !important;
-                width: 70mm;
+                width: 50%;
               }
               @page { size: A4 portrait; margin: 8mm; }
             }
@@ -246,7 +246,7 @@ export default function SiparisPanelPage() {
         </div>
       )}
 
-      {/* Toplu yazdırma alanı — 3'erli sayfalara bölünmüş, A4 dikey yan yana */}
+      {/* Toplu yazdırma alanı — 2'şerli sayfalara bölünmüş, A4 dikey yan yana (kesim için) */}
       {tumunuYazdir && (
         <div id="yazdirma-tumu" style={{ display: "none" }}>
           <style>{`
@@ -258,7 +258,7 @@ export default function SiparisPanelPage() {
               @page { size: A4 portrait; margin: 8mm; }
               .fis-sayfasi { display: flex; page-break-after: always; }
               .fis-sayfasi:last-child { page-break-after: auto; }
-              .fis-sutun { width: 63mm; padding: 0 4mm; border-right: 1px dashed #999; }
+              .fis-sutun { flex: 1; padding: 0 4mm; border-right: 1px dashed #999; }
               .fis-sutun:last-child { border-right: none; }
             }
           `}</style>
