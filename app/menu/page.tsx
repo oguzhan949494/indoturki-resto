@@ -311,6 +311,12 @@ function TableMenu() {
           </div>
 
           <div className="flex items-center gap-2">
+            <Link
+              href={`/fiyat-sor?masa=${tableNumber}`}
+              className="whitespace-nowrap rounded-full border border-[#e4d3c1] bg-white px-4 py-2.5 text-sm font-black text-[#5b4032]"
+            >
+              📷 Market Fiyat Gör
+            </Link>
             <div className="flex rounded-full border border-[#e4d3c1] bg-white p-1 text-[11px] font-black">
               <button
                 onClick={() => setLang("tr")}
@@ -325,14 +331,6 @@ function TableMenu() {
                 🇮🇩
               </button>
             </div>
-            <Link
-              href={`/fiyat-sor?masa=${tableNumber}`}
-              aria-label="Market Fiyatlarını Gör"
-              title="Market Fiyatlarını Gör"
-              className="rounded-full border border-[#e4d3c1] bg-white px-3 py-2.5 text-base"
-            >
-              📷
-            </Link>
             <button
               onClick={() => setCheckoutOpen(true)}
               className="relative rounded-full bg-[#231710] px-4 py-2.5 text-sm font-bold text-white shadow-sm"
