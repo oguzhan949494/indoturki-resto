@@ -118,7 +118,8 @@ async function runSync() {
         const categoryId = categoryNameToId.get(categoryName);
         if (!categoryId) return null;
 
-        const price = Number(variant.prices?.sellPrice ?? 0);
+        const priceEntry = Array.isArray(variant.prices) ? variant.prices[0] : variant.prices;
+        const price = Number(priceEntry?.sellPrice ?? 0);
         const stock = (variant.stocks ?? []).reduce(
           (sum: number, s: any) => sum + (Number(s.stockCount) || 0),
           0
