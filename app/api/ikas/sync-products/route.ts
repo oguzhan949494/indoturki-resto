@@ -24,7 +24,6 @@ const LIST_PRODUCT_QUERY = `
         variants {
           id
           sku
-          mainImageId
           images {
             imageId
             isMain
@@ -173,8 +172,9 @@ async function runSync() {
       // Geçici teşhis alanı: ikas'ın görsel alanını hangi yapıda döndürdüğünü
       // görmek için. Doğru eşleme yapıldıktan sonra bu kaldırılacak.
       debugImageSample: JSON.stringify(
-        allIkasProducts.find((p) => p.variants?.[0]?.mainImageId || p.variants?.[0]?.images?.length)
-          ?.variants?.[0] ?? allIkasProducts[0]?.variants?.[0] ?? null
+        allIkasProducts.find((p) => p.variants?.[0]?.images?.length)?.variants?.[0] ??
+          allIkasProducts[0]?.variants?.[0] ??
+          null
       ),
     });
   } catch (error) {
