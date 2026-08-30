@@ -297,9 +297,7 @@ export default function Home() {
   // sepete eklenemez. Yemek ürünlerinde (menu section) stok takibi yok,
   // sınırsız.
   const maxQtyFor = (product: Product) =>
-    product.section === "market" && product.stockQuantity != null
-      ? product.stockQuantity
-      : Infinity;
+    product.stockQuantity != null ? product.stockQuantity : Infinity;
 
   const addToCart = (product: Product) => {
     setCart((current) => {
@@ -797,11 +795,19 @@ export default function Home() {
                       <p className="mt-2 min-h-10 text-xs leading-5 text-[#806b5b]">
                         {productDescription(product)}
                       </p>
-                      {product.section === "market" && product.stockQuantity != null && (
-                        <p className="mt-1 text-[11px] font-bold text-[#a05a2c]">
-                          {lang === "tr"
-                            ? `Stokta ${product.stockQuantity} adet`
-                            : `Stok tersedia: ${product.stockQuantity}`}
+                      {product.stockQuantity != null && (
+                        <p
+                          className={`mt-1 text-[11px] font-bold ${
+                            product.stockQuantity > 0 ? "text-[#a05a2c]" : "text-red-600"
+                          }`}
+                        >
+                          {product.stockQuantity > 0
+                            ? lang === "tr"
+                              ? `Stokta ${product.stockQuantity} adet`
+                              : `Stok tersedia: ${product.stockQuantity}`
+                            : lang === "tr"
+                              ? "Stokta yok"
+                              : "Stok habis"}
                         </p>
                       )}
                     </div>

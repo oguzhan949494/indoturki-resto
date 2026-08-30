@@ -155,6 +155,24 @@ export default function ProductImagesPage() {
     }
   };
 
+  const stokMiktariGuncelle = async (product: Product, deger: string) => {
+    const sayi = deger.trim() === "" ? null : Math.max(0, parseInt(deger, 10) || 0);
+
+    setProducts((current) =>
+      current.map((p) => (p.id === product.id ? { ...p, stockQuantity: sayi } : p))
+    );
+
+    const { error } = await supabase
+      .from("products")
+      .update({ stock_quantity: sayi })
+      .eq("id", product.id);
+
+    if (error) {
+      console.error("Stok miktarı güncellenemedi:", error);
+      setErrorId(product.id);
+    }
+  };
+
   return (
     <main className="min-h-screen bg-[#f3f1ed] text-[#231710]">
       <header className="sticky top-0 z-20 border-b border-[#e2ddd3] bg-white px-4 py-4 sm:px-8">
@@ -244,6 +262,22 @@ export default function ProductImagesPage() {
                           />
                         </span>
                       </button>
+
+                      {product.section === "menu" && (
+                        <div className="mt-2">
+                          <label className="text-[10px] font-bold uppercase tracking-wide text-[#a18b7b]">
+                            Stok Adedi (boş = sınırsız)
+                          </label>
+                          <input
+                            type="number"
+                            min={0}
+                            defaultValue={product.stockQuantity ?? ""}
+                            onBlur={(e) => stokMiktariGuncelle(product, e.target.value)}
+                            placeholder="Sınırsız"
+                            className="mt-1 w-full rounded-lg border border-[#e5d4c2] px-2 py-1.5 text-xs outline-none focus:border-[#ef2b1e]"
+                          />
+                        </div>
+                      )}
 
                       <div className="mt-2 flex items-center gap-2">
                         <label
