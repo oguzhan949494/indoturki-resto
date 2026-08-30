@@ -1,6 +1,9 @@
+// @ts-nocheck
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import Link from "next/link";
 import { createClient } from "@/utils/supabase/client";
 
 const supabase = createClient();
@@ -11,7 +14,10 @@ const BARKOD_KOLON = "barkod";
 const AD_KOLON = "urun_adi";
 const FIYAT_KOLON = "fiyat";
 
-export default function FiyatSorPage() {
+function FiyatSorInner() {
+  const searchParams = useSearchParams();
+  const masaNo = searchParams.get("masa");
+
   const readerRef = useRef(null);
   const scannerRef = useRef(null);
   const [sonuc, setSonuc] = useState(null); // { ad, fiyat } | "hata" | "bekleniyor" | null
@@ -117,6 +123,29 @@ export default function FiyatSorPage() {
         fontFamily: "-apple-system, Segoe UI, Roboto, Arial, sans-serif",
       }}
     >
+      {masaNo && (
+        <div style={{ width: "100%", maxWidth: 460, marginBottom: 8 }}>
+          <Link
+            href={`/menu?masa=${masaNo}`}
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 6,
+              padding: "10px 16px",
+              borderRadius: 10,
+              border: "1px solid #2a2d36",
+              background: "#1a1d24",
+              color: "#f2f2f2",
+              fontWeight: 600,
+              textDecoration: "none",
+              fontSize: "0.95rem",
+            }}
+          >
+            ← Masaya Dön
+          </Link>
+        </div>
+      )}
+
       <h1 style={{ fontSize: "1.2rem", margin: "8px 0 16px", textAlign: "center" }}>
         📷 Ürünün barkodunu kameraya gösterin
       </h1>
@@ -204,5 +233,13 @@ export default function FiyatSorPage() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function FiyatSorPage() {
+  return (
+    <Suspense fallback={null}>
+      <FiyatSorInner />
+    </Suspense>
   );
 }
