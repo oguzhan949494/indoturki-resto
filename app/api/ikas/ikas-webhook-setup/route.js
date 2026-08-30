@@ -36,7 +36,7 @@ export async function GET(request) {
     const accessToken = await ikasAccessTokenAl();
 
     // Webhook'un gideceği adres: bu sitenin sipariş yakalayıcı endpoint'i
-    const webhookEndpoint = `https://${request.headers.get("host")}/api/ikas-order-webhook?secret=${process.env.SYNC_SECRET}`;
+    const webhookEndpoint = `https://${request.headers.get("host")}/api/ikas/ikas-order-webhook?secret=${process.env.SYNC_SECRET}`;
 
     const mutation = `mutation {
       saveWebhook(input: {
