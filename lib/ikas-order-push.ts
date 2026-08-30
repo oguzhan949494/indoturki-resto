@@ -1,22 +1,18 @@
 import { createClient } from "@supabase/supabase-js";
 import { ikasGraphQL } from "./ikas-client";
 
-const FOOD_PLACEHOLDER_NAME = "Restoran Ürünü";
-const COURIER_PLACEHOLDER_NAME = "Kurye Ücreti";
+// ikas.dev resmi dokümantasyonundan doğrulanmış şema:
+//   CreateOrderWithTransactionsInput { order: CreateOrderInput!, transactions: [OrderTransactionInput!]! }
+//   CreateOrderInput { orderLineItems: [OrderLineItemInput!]!, customer, note, ... }
+//   OrderLineItemInput { variant: OrderLineVariantInput!, price: Float!, quantity: Float! }
+//   OrderLineVariantInput { id: String, name: String }  -> id boş bırakılırsa "ikas'ta kayıtlı
+//     olmayan ürün" olarak kabul ediliyor; biz "Restoran Ürünü" ve "Kurye Ücreti" satırları için
+//     bunu kullanıyoruz (ayrıca ikas'ta placeholder ürün oluşturmaya gerek kalmadı).
+//   OrderCustomerInput { id, email, firstName, lastName } -> telefon alanı YOK, notta iletiyoruz.
+//   OrderTransactionInput { amount: Float!, paymentGatewayId: String }
 
-const FIND_PLACEHOLDER_QUERY = `
-  query FindPlaceholder($name: StringFilterInput) {
-    listProduct(name: $name) {
-      data {
-        id
-        name
-        variants {
-          id
-        }
-      }
-    }
-  }
-`;
+const FOOD_LINE_NAME = "Restoran Ürünü";
+const COURIER_LINE_NAME = "Kurye Ücreti";
 
 const CREATE_ORDER_MUTATION = `
   mutation CreateOrder($input: CreateOrderWithTransactionsInput!) {
@@ -34,74 +30,11 @@ function getSupabase() {
   return createClient<any, any, any>(supabaseUrl, supabaseAnonKey);
 }
 
-type PlaceholderKind = "food" | "courier";
-
-const PLACEHOLDER_CONFIG: Record<
-  PlaceholderKind,
-  { name: string; productCol: string; variantCol: string }
-> = {
-  food: {
-    name: FOOD_PLACEHOLDER_NAME,
-    productCol: "ikas_placeholder_product_id",
-    variantCol: "ikas_placeholder_variant_id",
-  },
-  courier: {
-    name: COURIER_PLACEHOLDER_NAME,
-    productCol: "ikas_courier_placeholder_product_id",
-    variantCol: "ikas_courier_placeholder_variant_id",
-  },
-};
-
-// Bir placeholder ürünün (Restoran Ürünü / Kurye Ücreti) ikas kimliğini
-// bulur; ilk seferde ikas'ta arayıp restaurant_settings'e önbelleğe alır,
-// sonrakilerde doğrudan önbellekten okur.
-async function getPlaceholderIds(
-  supabase: ReturnType<typeof createClient<any, any, any>>,
-  kind: PlaceholderKind
-) {
-  const config = PLACEHOLDER_CONFIG[kind];
-
-  const { data: settingsRaw } = await supabase
-    .from("restaurant_settings")
-    .select(`id, ${config.productCol}, ${config.variantCol}`)
-    .limit(1)
-    .maybeSingle();
-  const settings = settingsRaw as any;
-
-  if (settings?.[config.productCol] && settings?.[config.variantCol]) {
-    return {
-      productId: settings[config.productCol] as string,
-      variantId: settings[config.variantCol] as string,
-    };
-  }
-
-  const data = await ikasGraphQL<any>(FIND_PLACEHOLDER_QUERY, {
-    name: { eq: config.name },
-  });
-  const found = data?.listProduct?.data?.[0];
-  const variantId = found?.variants?.[0]?.id;
-
-  if (!found || !variantId) {
-    throw new Error(
-      `ikas'ta "${config.name}" adında bir ürün bulunamadı. Lütfen bu isimde bir ürün oluşturun.`
-    );
-  }
-
-  await supabase
-    .from("restaurant_settings")
-    .update({
-      [config.productCol]: found.id,
-      [config.variantCol]: variantId,
-    })
-    .eq("id", (settings as any)?.id ?? undefined);
-
-  return { productId: found.id as string, variantId: variantId as string };
-}
-
 // Ödemesi onaylanmış bir paket servis siparişini ikas'a gerçek bir
-// sipariş olarak gönderir. Yemek tutarı (+ kurye ücreti) placeholder
-// ürüne, market ürünleri ise gerçek ikas ürün/varyant kimlikleriyle
-// eklenir (bu sayede market stoğu otomatik düşer).
+// sipariş olarak gönderir. Yemek tutarı ve kurye ücreti ayrı, serbest
+// metin (kayıtsız ürün) satırları olarak eklenir; market ürünleri ise
+// gerçek ikas varyant kimlikleriyle eklenir (bu sayede market stoğu
+// otomatik düşer).
 export async function pushOrderToIkas(orderId: string): Promise<void> {
   const supabase = getSupabase();
 
@@ -125,8 +58,6 @@ export async function pushOrderToIkas(orderId: string): Promise<void> {
     return;
   }
 
-  const { variantId: foodVariantId } = await getPlaceholderIds(supabase, "food");
-
   let foodTotal = 0;
   const marketLines: { variantId: string; quantity: number; price: number }[] = [];
 
@@ -143,33 +74,42 @@ export async function pushOrderToIkas(orderId: string): Promise<void> {
     }
   }
 
-  const orderLineItems: { variantId: string; quantity: number; price: number }[] = [];
-  if (foodTotal > 0) {
-    orderLineItems.push({ variantId: foodVariantId, quantity: 1, price: foodTotal });
-  }
-
   const courierFee = Number(order.courier_fee_tl) || 0;
+
+  const orderLineItems: { variant: { id?: string; name?: string }; price: number; quantity: number }[] = [];
+
+  if (foodTotal > 0) {
+    orderLineItems.push({ variant: { name: FOOD_LINE_NAME }, price: foodTotal, quantity: 1 });
+  }
   if (courierFee > 0) {
-    const { variantId: courierVariantId } = await getPlaceholderIds(supabase, "courier");
-    orderLineItems.push({ variantId: courierVariantId, quantity: 1, price: courierFee });
+    orderLineItems.push({ variant: { name: COURIER_LINE_NAME }, price: courierFee, quantity: 1 });
+  }
+  for (const line of marketLines) {
+    orderLineItems.push({
+      variant: { id: line.variantId },
+      price: line.price,
+      quantity: line.quantity,
+    });
   }
 
-  orderLineItems.push(...marketLines);
+  if (orderLineItems.length === 0) {
+    return;
+  }
+
+  const totalAmount = orderLineItems.reduce((sum, line) => sum + line.price * line.quantity, 0);
 
   const variables = {
     input: {
-      orderLineItems: orderLineItems.map((line) => ({
-        variantId: line.variantId,
-        quantity: line.quantity,
-        price: line.price,
-      })),
-      customer: {
-        firstName: order.customer_name || "Müşteri",
-        phone: order.customer_phone || undefined,
+      order: {
+        orderLineItems,
+        customer: {
+          firstName: order.customer_name || "Müşteri",
+        },
+        note: `Indoturki Resto sipariş no: ID-${order.order_number} — Tel: ${
+          order.customer_phone || "-"
+        }${order.delivery_address ? " — " + order.delivery_address : ""}`,
       },
-      note: `Indoturki Resto sipariş no: ID-${order.order_number}${
-        order.delivery_address ? " — " + order.delivery_address : ""
-      }`,
+      transactions: [{ amount: totalAmount }],
     },
   };
 
