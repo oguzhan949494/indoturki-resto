@@ -140,14 +140,11 @@ export default function SiparisPanelPage() {
     siparisleriGetir();
   }
 
-  // Yazdırma sırasında 2'şerli gruplara böl (A4 dikey sayfa, kesim için 2 fiş yan yana)
-  function sayfalaraBol(liste: Siparis[]): Siparis[][] {
-    const sayfalar: Siparis[][] = [];
-    for (let i = 0; i < liste.length; i += 2) {
-      sayfalar.push(liste.slice(i, i + 3));
-    }
-    return sayfalar;
-  }
+  // Kağıt artık A4 DEĞİL — önceden 102mm x 152mm boyutunda kesilip
+  // doğrudan yazıcıya besleniyor. Bu yüzden her fiş kendi sayfasında
+  // basılıyor, A4'ü paylaştırmaya (sütunlara bölmeye) gerek kalmadı.
+  const KAGIT_BOYUTU = "102mm 152mm";
+  const KAGIT_KENAR_BOSLUGU = "5mm";
 
   return (
     <>
@@ -230,45 +227,35 @@ export default function SiparisPanelPage() {
         </div>
       </div>
 
-      {/* Tekli yazdırma alanı — ekranda hiç görünmez, sadece yazdırmada belirir */}
+      {/* Tekli yazdırma alanı — ekranda hiç görünmez, sadece yazdırmada belirir.
+          Sayfa boyutu, önceden kestiğin kağıtla (105mm x 297mm) birebir eşleşiyor. */}
       {yazdirilacak && (
         <div id="yazdirma-tekli" style={{ display: "none" }}>
           <style>{`
             @media print {
-              #yazdirma-tekli {
-                display: block !important;
-                width: 50%;
-              }
-              @page { size: A4 portrait; margin: 8mm; }
+              #yazdirma-tekli { display: block !important; }
+              @page { size: ${KAGIT_BOYUTU}; margin: ${KAGIT_KENAR_BOSLUGU}; }
             }
           `}</style>
           <FisIcerigi siparis={yazdirilacak} />
         </div>
       )}
 
-      {/* Toplu yazdırma alanı — 2'şerli sayfalara bölünmüş, A4 dikey yan yana (kesim için) */}
+      {/* Toplu yazdırma alanı — her fiş KENDİ sayfasında (yani kendi
+          önceden kesilmiş kağıdında) basılıyor, yan yana sütun yok. */}
       {tumunuYazdir && (
         <div id="yazdirma-tumu" style={{ display: "none" }}>
           <style>{`
             @media print {
-              #yazdirma-tumu {
-                display: block !important;
-                width: 100%;
-              }
-              @page { size: A4 portrait; margin: 8mm; }
-              .fis-sayfasi { display: flex; page-break-after: always; }
-              .fis-sayfasi:last-child { page-break-after: auto; }
-              .fis-sutun { flex: 1; padding: 0 4mm; border-right: 1px dashed #999; }
-              .fis-sutun:last-child { border-right: none; }
+              #yazdirma-tumu { display: block !important; }
+              @page { size: ${KAGIT_BOYUTU}; margin: ${KAGIT_KENAR_BOSLUGU}; }
+              .fis-sayfa { page-break-after: always; }
+              .fis-sayfa:last-child { page-break-after: auto; }
             }
           `}</style>
-          {sayfalaraBol(tumunuYazdir).map((sayfa, i) => (
-            <div key={i} className="fis-sayfasi">
-              {sayfa.map((s) => (
-                <div key={s.id} className="fis-sutun">
-                  <FisIcerigi siparis={s} />
-                </div>
-              ))}
+          {tumunuYazdir.map((s) => (
+            <div key={s.id} className="fis-sayfa">
+              <FisIcerigi siparis={s} />
             </div>
           ))}
         </div>
