@@ -4,6 +4,7 @@ import { Suspense, useEffect, useMemo, useState } from "react";
 import type { FormEvent } from "react";
 import { useSearchParams } from "next/navigation";
 import { createClient } from "@/utils/supabase/client";
+import Link from "next/link";
 import {
   ALL_CATEGORY_ID,
   categoryAllowsExtraNoodle,
@@ -324,6 +325,14 @@ function TableMenu() {
                 🇮🇩
               </button>
             </div>
+            <Link
+              href={`/fiyat-sor?masa=${tableNumber}`}
+              aria-label="Market Fiyatlarını Gör"
+              title="Market Fiyatlarını Gör"
+              className="rounded-full border border-[#e4d3c1] bg-white px-3 py-2.5 text-base"
+            >
+              📷
+            </Link>
             <button
               onClick={() => setCheckoutOpen(true)}
               className="relative rounded-full bg-[#231710] px-4 py-2.5 text-sm font-bold text-white shadow-sm"
