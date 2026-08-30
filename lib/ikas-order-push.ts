@@ -3,16 +3,33 @@ import { ikasGraphQL } from "./ikas-client";
 
 // ikas.dev resmi dokümantasyonundan doğrulanmış şema:
 //   CreateOrderWithTransactionsInput { order: CreateOrderInput!, transactions: [OrderTransactionInput!]! }
-//   CreateOrderInput { orderLineItems: [OrderLineItemInput!]!, customer, note, ... }
+//   CreateOrderInput { orderLineItems: [OrderLineItemInput!]!, customer, note, salesChannelId, ... }
 //   OrderLineItemInput { variant: OrderLineVariantInput!, price: Float!, quantity: Float! }
-//   OrderLineVariantInput { id: String, name: String }  -> id boş bırakılırsa "ikas'ta kayıtlı
-//     olmayan ürün" olarak kabul ediliyor; biz "Restoran Ürünü" ve "Kurye Ücreti" satırları için
-//     bunu kullanıyoruz (ayrıca ikas'ta placeholder ürün oluşturmaya gerek kalmadı).
+//   OrderLineVariantInput { id: String, name: String }
 //   OrderCustomerInput { id, email, firstName, lastName } -> telefon alanı YOK, notta iletiyoruz.
 //   OrderTransactionInput { amount: Float!, paymentGatewayId: String }
+//
+// NOT: "id boş bırakılabilir" dense de, bu hesapta ID'siz (isim bazlı) satırlar
+// "Stock location not found" hatası veriyor. Bu yüzden "Restoran Ürünü" ve
+// "Kurye Ücreti" için de GERÇEK, ikas'ta kayıtlı ürünlerin varyant ID'lerini
+// kullanıyoruz (ilk seferde isimle arayıp restaurant_settings'e önbelleğe alıyoruz).
 
-const FOOD_LINE_NAME = "Restoran Ürünü";
-const COURIER_LINE_NAME = "Kurye Ücreti";
+const FOOD_PLACEHOLDER_NAME = "Restoran Ürünü";
+const COURIER_PLACEHOLDER_NAME = "Kurye Ücreti";
+
+const FIND_PLACEHOLDER_QUERY = `
+  query FindPlaceholder($name: StringFilterInput) {
+    listProduct(name: $name) {
+      data {
+        id
+        name
+        variants {
+          id
+        }
+      }
+    }
+  }
+`;
 
 const CREATE_ORDER_MUTATION = `
   mutation CreateOrder($input: CreateOrderWithTransactionsInput!) {
@@ -30,11 +47,74 @@ function getSupabase() {
   return createClient<any, any, any>(supabaseUrl, supabaseAnonKey);
 }
 
+type PlaceholderKind = "food" | "courier";
+
+const PLACEHOLDER_CONFIG: Record<
+  PlaceholderKind,
+  { name: string; productCol: string; variantCol: string }
+> = {
+  food: {
+    name: FOOD_PLACEHOLDER_NAME,
+    productCol: "ikas_placeholder_product_id",
+    variantCol: "ikas_placeholder_variant_id",
+  },
+  courier: {
+    name: COURIER_PLACEHOLDER_NAME,
+    productCol: "ikas_courier_placeholder_product_id",
+    variantCol: "ikas_courier_placeholder_variant_id",
+  },
+};
+
+// Bir placeholder ürünün (Restoran Ürünü / Kurye Ücreti) ikas varyant
+// kimliğini bulur; ilk seferde ikas'ta arayıp restaurant_settings'e
+// önbelleğe alır, sonrakilerde doğrudan önbellekten okur.
+async function getPlaceholderVariantId(
+  supabase: ReturnType<typeof createClient<any, any, any>>,
+  kind: PlaceholderKind
+): Promise<string> {
+  const config = PLACEHOLDER_CONFIG[kind];
+
+  const { data: settingsRaw } = await supabase
+    .from("restaurant_settings")
+    .select(`id, ${config.productCol}, ${config.variantCol}`)
+    .limit(1)
+    .maybeSingle();
+  const settings = settingsRaw as any;
+
+  if (settings?.[config.variantCol]) {
+    return settings[config.variantCol] as string;
+  }
+
+  const data = await ikasGraphQL<any>(FIND_PLACEHOLDER_QUERY, {
+    name: { eq: config.name },
+  });
+  const found = data?.listProduct?.data?.[0];
+  const variantId = found?.variants?.[0]?.id;
+
+  if (!found || !variantId) {
+    throw new Error(
+      `ikas'ta "${config.name}" adında bir ürün bulunamadı. Lütfen bu isimde bir ürün oluşturun.`
+    );
+  }
+
+  if (settings?.id) {
+    await supabase
+      .from("restaurant_settings")
+      .update({
+        [config.productCol]: found.id,
+        [config.variantCol]: variantId,
+      })
+      .eq("id", settings.id);
+  }
+
+  return variantId as string;
+}
+
 // Ödemesi onaylanmış bir paket servis siparişini ikas'a gerçek bir
-// sipariş olarak gönderir. Yemek tutarı ve kurye ücreti ayrı, serbest
-// metin (kayıtsız ürün) satırları olarak eklenir; market ürünleri ise
-// gerçek ikas varyant kimlikleriyle eklenir (bu sayede market stoğu
-// otomatik düşer).
+// sipariş olarak gönderir. Yemek tutarı ve kurye ücreti, ikas'ta
+// oluşturduğun gerçek "Restoran Ürünü" / "Kurye Ücreti" ürünlerinin
+// varyant ID'leriyle eklenir; market ürünleri ise gerçek ikas varyant
+// kimlikleriyle eklenir (bu sayede market stoğu otomatik düşer).
 export async function pushOrderToIkas(orderId: string): Promise<void> {
   const supabase = getSupabase();
 
@@ -76,13 +156,15 @@ export async function pushOrderToIkas(orderId: string): Promise<void> {
 
   const courierFee = Number(order.courier_fee_tl) || 0;
 
-  const orderLineItems: { variant: { id?: string; name?: string }; price: number; quantity: number }[] = [];
+  const orderLineItems: { variant: { id: string }; price: number; quantity: number }[] = [];
 
   if (foodTotal > 0) {
-    orderLineItems.push({ variant: { name: FOOD_LINE_NAME }, price: foodTotal, quantity: 1 });
+    const foodVariantId = await getPlaceholderVariantId(supabase, "food");
+    orderLineItems.push({ variant: { id: foodVariantId }, price: foodTotal, quantity: 1 });
   }
   if (courierFee > 0) {
-    orderLineItems.push({ variant: { name: COURIER_LINE_NAME }, price: courierFee, quantity: 1 });
+    const courierVariantId = await getPlaceholderVariantId(supabase, "courier");
+    orderLineItems.push({ variant: { id: courierVariantId }, price: courierFee, quantity: 1 });
   }
   for (const line of marketLines) {
     orderLineItems.push({
@@ -98,13 +180,13 @@ export async function pushOrderToIkas(orderId: string): Promise<void> {
 
   const totalAmount = orderLineItems.reduce((sum, line) => sum + line.price * line.quantity, 0);
 
-  const { data: settings } = await supabase
+  const { data: settingsForChannel } = await supabase
     .from("restaurant_settings")
     .select("ikas_default_sales_channel_id")
     .limit(1)
     .maybeSingle();
 
-  const salesChannelId = (settings as any)?.ikas_default_sales_channel_id || undefined;
+  const salesChannelId = (settingsForChannel as any)?.ikas_default_sales_channel_id || undefined;
 
   const variables = {
     input: {
