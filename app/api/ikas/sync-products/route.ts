@@ -10,6 +10,15 @@ import { ikasGraphQL } from "@/lib/ikas-client";
 // sınırını aşma riski vardı). Bu sürüm önce tüm veriyi ikas'tan toplar,
 // sonra kategorileri ve ürünleri TOPLU (tek sorguda) kaydeder.
 
+// ikas'ta her görsel şu adres kalıbıyla erişilebilir:
+// https://cdn.myikas.com/images/{MAĞAZA_ID}/{GÖRSEL_ID}/image_{boyut}.webp
+// Mağaza ID'si (aşağıdaki sabit) tüm görsellerde aynı, sadece görsel ID'si değişiyor.
+const IKAS_STORE_ASSET_ID = "aeb81354-e524-4178-8a56-7b8d7eda742d";
+
+function buildIkasImageUrl(imageId: string) {
+  return `https://cdn.myikas.com/images/${IKAS_STORE_ASSET_ID}/${imageId}/image_600.webp`;
+}
+
 const LIST_PRODUCT_QUERY = `
   query ListProducts($page: Int!, $limit: Int!) {
     listProduct(pagination: { page: $page, limit: $limit }) {
@@ -130,6 +139,10 @@ async function runSync() {
           0
         );
 
+        const mainImage =
+          (variant.images ?? []).find((img: any) => img.isMain) ?? variant.images?.[0];
+        const imageUrl = mainImage?.imageId ? buildIkasImageUrl(mainImage.imageId) : null;
+
         return {
           category_id: categoryId,
           name_tr: product.name,
@@ -137,6 +150,7 @@ async function runSync() {
           description_tr: product.description || "",
           description_id: product.description || "",
           price_tl: price,
+          image_url: imageUrl,
           section: "market",
           source: "ikas",
           ikas_product_id: product.id,
@@ -166,17 +180,7 @@ async function runSync() {
       }
     }
 
-    return NextResponse.json({
-      success: true,
-      totalSynced: dedupedPayloads.length,
-      // Geçici teşhis alanı: ikas'ın görsel alanını hangi yapıda döndürdüğünü
-      // görmek için. Doğru eşleme yapıldıktan sonra bu kaldırılacak.
-      debugImageSample: JSON.stringify(
-        allIkasProducts.find((p) => p.variants?.[0]?.images?.length)?.variants?.[0] ??
-          allIkasProducts[0]?.variants?.[0] ??
-          null
-      ),
-    });
+    return NextResponse.json({ success: true, totalSynced: dedupedPayloads.length });
   } catch (error) {
     console.error("IKAS SENKRONIZASYON HATASI:", error);
     return NextResponse.json(

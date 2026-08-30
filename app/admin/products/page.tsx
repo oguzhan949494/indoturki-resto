@@ -47,9 +47,7 @@ export default function ProductImagesPage() {
         setSyncResult(`❌ ${data.error || "Senkronizasyon başarısız oldu."}`);
         return;
       }
-      setSyncResult(
-        `✅ ${data.totalSynced} market ürünü güncellendi.\n\n🔍 Görsel teşhis verisi (bunu Claude'a yapıştır):\n${data.debugImageSample}`
-      );
+      setSyncResult(`✅ ${data.totalSynced} market ürünü güncellendi.`);
       loadData();
     } catch {
       setSyncResult("❌ Senkronizasyon başarısız oldu.");
