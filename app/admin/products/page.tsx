@@ -17,12 +17,14 @@ export default function ProductImagesPage() {
   const [loading, setLoading] = useState(true);
   const [uploadingId, setUploadingId] = useState<string | null>(null);
   const [errorId, setErrorId] = useState<string | null>(null);
+  const [syncing, setSyncing] = useState(false);
+  const [syncResult, setSyncResult] = useState<string | null>(null);
 
   const loadData = useCallback(async () => {
     setLoading(true);
     const { data: categoryData } = await supabase
       .from("categories")
-      .select("id, name_tr, name_id, emoji, sort_order")
+      .select("id, name_tr, name_id, emoji, sort_order, section")
       .order("sort_order", { ascending: true });
 
     const { data: productData } = await supabase
@@ -34,6 +36,25 @@ export default function ProductImagesPage() {
     setProducts(mapProducts(productData));
     setLoading(false);
   }, [supabase]);
+
+  const syncMarketProducts = async () => {
+    setSyncing(true);
+    setSyncResult(null);
+    try {
+      const res = await fetch("/api/ikas/sync-products", { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) {
+        setSyncResult(`❌ ${data.error || "Senkronizasyon başarısız oldu."}`);
+        return;
+      }
+      setSyncResult(`✅ ${data.totalSynced} market ürünü güncellendi.`);
+      loadData();
+    } catch {
+      setSyncResult("❌ Senkronizasyon başarısız oldu.");
+    } finally {
+      setSyncing(false);
+    }
+  };
 
   useEffect(() => {
     loadData();
@@ -137,20 +158,32 @@ export default function ProductImagesPage() {
   return (
     <main className="min-h-screen bg-[#f3f1ed] text-[#231710]">
       <header className="sticky top-0 z-20 border-b border-[#e2ddd3] bg-white px-4 py-4 sm:px-8">
-        <div className="mx-auto flex max-w-5xl items-center justify-between">
+        <div className="mx-auto flex max-w-5xl items-center justify-between gap-3">
           <div>
             <h1 className="text-xl font-black">Ürün Yönetimi</h1>
             <p className="text-xs text-[#7a6f63]">
               Görsel yükle, stok durumunu aç/kapat.
             </p>
           </div>
-          <Link
-            href="/admin"
-            className="rounded-full border border-[#e2ddd3] px-4 py-2 text-xs font-bold text-[#5b4032]"
-          >
-            ← Panele Dön
-          </Link>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={syncMarketProducts}
+              disabled={syncing}
+              className="rounded-full bg-[#231710] px-4 py-2 text-xs font-bold text-white disabled:opacity-50"
+            >
+              {syncing ? "Güncelleniyor..." : "🔄 Market Ürünlerini Güncelle"}
+            </button>
+            <Link
+              href="/admin"
+              className="rounded-full border border-[#e2ddd3] px-4 py-2 text-xs font-bold text-[#5b4032]"
+            >
+              ← Panele Dön
+            </Link>
+          </div>
         </div>
+        {syncResult && (
+          <p className="mx-auto mt-2 max-w-5xl text-xs font-bold text-[#5b4032]">{syncResult}</p>
+        )}
       </header>
 
       <section className="mx-auto max-w-5xl px-4 py-6 sm:px-8">

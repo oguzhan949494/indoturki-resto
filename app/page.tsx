@@ -78,6 +78,7 @@ export default function Home() {
   const [loading, setLoading] = useState(true);
 
   const [activeCategory, setActiveCategory] = useState<string>(ALL_CATEGORY_ID);
+  const [menuSection, setMenuSection] = useState<"menu" | "market">("menu");
   const [search, setSearch] = useState("");
   const [cart, setCart] = useState<CartLine[]>([]);
   const [lang, setLang] = useState<"tr" | "id">("tr");
@@ -114,7 +115,7 @@ export default function Home() {
 
       const { data: categoryData, error: categoryError } = await supabase
         .from("categories")
-        .select("id, name_tr, name_id, emoji, sort_order")
+        .select("id, name_tr, name_id, emoji, sort_order, section")
         .eq("is_active", true)
         .order("sort_order", { ascending: true });
 
@@ -276,15 +277,21 @@ export default function Home() {
   const visibleProducts = useMemo(() => {
     const q = search.trim().toLocaleLowerCase("tr-TR");
     return products.filter((product) => {
+      const sectionMatch = product.section === menuSection;
       const categoryMatch =
         activeCategory === ALL_CATEGORY_ID || product.categoryId === activeCategory;
       const name = productName(product).toLocaleLowerCase("tr-TR");
       const desc = productDescription(product).toLocaleLowerCase("tr-TR");
       const searchMatch = !q || name.includes(q) || desc.includes(q);
-      return categoryMatch && searchMatch;
+      return sectionMatch && categoryMatch && searchMatch;
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeCategory, search, products, lang]);
+  }, [activeCategory, search, products, lang, menuSection]);
+
+  const visibleCategories = useMemo(
+    () => categories.filter((category) => category.section === menuSection),
+    [categories, menuSection]
+  );
 
   const addToCart = (product: Product) => {
     setCart((current) => {
@@ -601,6 +608,37 @@ export default function Home() {
           </div>
         </div>
 
+        <div className="mx-auto max-w-6xl px-4 pb-3 pt-3 sm:px-6">
+          <div className="flex gap-2">
+            <button
+              onClick={() => {
+                setMenuSection("menu");
+                setActiveCategory(ALL_CATEGORY_ID);
+              }}
+              className={`flex-1 rounded-2xl px-4 py-2.5 text-sm font-black transition ${
+                menuSection === "menu"
+                  ? "bg-[#231710] text-white shadow-sm"
+                  : "border border-[#e5d6c7] bg-white text-[#5b4032]"
+              }`}
+            >
+              🍽️ {lang === "tr" ? "Menü" : "Menu"}
+            </button>
+            <button
+              onClick={() => {
+                setMenuSection("market");
+                setActiveCategory(ALL_CATEGORY_ID);
+              }}
+              className={`flex-1 rounded-2xl px-4 py-2.5 text-sm font-black transition ${
+                menuSection === "market"
+                  ? "bg-[#231710] text-white shadow-sm"
+                  : "border border-[#e5d6c7] bg-white text-[#5b4032]"
+              }`}
+            >
+              🛒 {lang === "tr" ? "Market" : "Pasar"}
+            </button>
+          </div>
+        </div>
+
         <div className="mx-auto max-w-6xl px-4 pb-3 sm:px-6">
           <div className="relative">
             <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400">⌕</span>
@@ -626,7 +664,7 @@ export default function Home() {
               <span>✨</span>
               {lang === "tr" ? "Tümü" : "Semua"}
             </button>
-            {categories.map((category) => (
+            {visibleCategories.map((category) => (
               <button
                 key={category.id}
                 onClick={() => setActiveCategory(category.id)}
@@ -689,7 +727,7 @@ export default function Home() {
             <h2 className="mt-1 text-2xl font-black sm:text-3xl">
               {activeCategory === ALL_CATEGORY_ID
                 ? tr.popular
-                : categoryName(categories.find((c) => c.id === activeCategory)!)}
+                : categoryName(visibleCategories.find((c) => c.id === activeCategory)!)}
             </h2>
           </div>
           <div className="text-xs font-semibold text-[#8b7566]">

@@ -24,6 +24,8 @@ type OrderRow = {
   customer_phone: string | null;
   delivery_address: string | null;
   delivery_note: string | null;
+  pushed_to_ikas: boolean;
+  ikas_push_error: string | null;
   leave_at_reception: boolean;
   delivery_lat: number | null;
   delivery_lng: number | null;
@@ -84,7 +86,7 @@ export default function AdminPage() {
     const { data, error } = await supabase
       .from("orders")
       .select(
-        "id, order_number, source, table_id, customer_name, customer_phone, delivery_address, delivery_lat, delivery_lng, delivery_note, leave_at_reception, courier_fee_tl, delivery_distance_km, total_tl, sambal_requested, order_status, payment_status, created_at, order_items(id, product_name_tr, quantity, unit_price_tl, item_note, options), restaurant_tables(table_number)"
+        "id, order_number, source, table_id, customer_name, customer_phone, delivery_address, delivery_lat, delivery_lng, delivery_note, leave_at_reception, pushed_to_ikas, ikas_push_error, courier_fee_tl, delivery_distance_km, total_tl, sambal_requested, order_status, payment_status, created_at, order_items(id, product_name_tr, quantity, unit_price_tl, item_note, options), restaurant_tables(table_number)"
       )
       .neq("order_status", "completed")
       .order("created_at", { ascending: false });
@@ -185,11 +187,16 @@ export default function AdminPage() {
   };
 
   const markPaid = async (order: OrderRow) => {
-    const { error } = await supabase
-      .from("orders")
-      .update({ payment_status: "paid" })
-      .eq("id", order.id);
-    if (error) console.error(error);
+    const res = await fetch("/api/ikas/mark-paid", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ orderId: order.id }),
+    });
+    if (!res.ok) {
+      console.error("Ödendi işaretlenemedi");
+      return;
+    }
+    loadOrders();
   };
 
   const resolveCall = async (call: StaffCallRow) => {
@@ -344,6 +351,26 @@ export default function AdminPage() {
                       >
                         {order.payment_status === "paid" ? "Ödendi" : "Ödeme bekliyor"}
                       </span>
+                      {order.source === "delivery" && order.payment_status === "paid" && (
+                        <div className="mt-1">
+                          {order.pushed_to_ikas ? (
+                            <span className="inline-block rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-black text-blue-700">
+                              ✅ ikas'a gönderildi
+                            </span>
+                          ) : order.ikas_push_error ? (
+                            <span
+                              className="inline-block cursor-help rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-black text-red-700"
+                              title={order.ikas_push_error}
+                            >
+                              ⚠️ ikas hatası
+                            </span>
+                          ) : (
+                            <span className="inline-block rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-black text-gray-600">
+                              ⏳ ikas'a gönderiliyor
+                            </span>
+                          )}
+                        </div>
+                      )}
                     </div>
                   </div>
 

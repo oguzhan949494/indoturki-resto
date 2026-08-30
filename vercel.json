@@ -1,0 +1,8 @@
+{
+  "crons": [
+    {
+      "path": "/api/ikas/sync-products",
+      "schedule": "*/15 * * * *"
+    }
+  ]
+}

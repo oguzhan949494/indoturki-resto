@@ -82,14 +82,16 @@ function TableMenu() {
 
       const { data: categoryData } = await supabase
         .from("categories")
-        .select("id, name_tr, name_id, emoji, sort_order")
+        .select("id, name_tr, name_id, emoji, sort_order, section")
         .eq("is_active", true)
+        .eq("section", "menu")
         .order("sort_order", { ascending: true });
 
       const { data: productData } = await supabase
         .from("products")
         .select("*")
         .eq("is_available", true)
+        .eq("section", "menu")
         .order("sort_order", { ascending: true });
 
       setCategories(mapCategories(categoryData));

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import crypto from "node:crypto";
 import { createClient } from "@supabase/supabase-js";
+import { pushOrderToIkasSafely } from "@/lib/ikas-order-push";
 
 // PayTR bu adrese ödeme sonucunu POST eder (form-urlencoded).
 // Cevap olarak DAİMA düz metin "OK" döndürmemiz gerekiyor, aksi halde
@@ -41,13 +42,17 @@ export async function POST(request: NextRequest) {
 
     if (supabaseUrl && supabaseAnonKey) {
       const supabase = createClient(supabaseUrl, supabaseAnonKey);
-      const { error } = await supabase
+      const { data: updatedOrder, error } = await supabase
         .from("orders")
         .update({ payment_status: "paid" })
-        .eq("order_number", orderNumber);
+        .eq("order_number", orderNumber)
+        .select("id")
+        .maybeSingle();
 
       if (error) {
         console.error("PAYTR CALLBACK: sipariş güncellenemedi", error);
+      } else if (updatedOrder) {
+        await pushOrderToIkasSafely(updatedOrder.id);
       }
     }
   }

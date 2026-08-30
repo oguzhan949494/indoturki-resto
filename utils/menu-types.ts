@@ -4,6 +4,7 @@ export type DbCategory = {
   name_id: string;
   emoji: string | null;
   sort_order: number;
+  section: string | null;
 };
 
 export type DbProduct = {
@@ -19,6 +20,7 @@ export type DbProduct = {
   is_available: boolean;
   sort_order: number;
   image_url: string | null;
+  section: string | null;
 };
 
 export type Category = {
@@ -27,6 +29,7 @@ export type Category = {
   nameId: string;
   emoji: string;
   sortOrder: number;
+  section: "menu" | "market";
 };
 
 export type Product = {
@@ -41,6 +44,7 @@ export type Product = {
   isNew: boolean;
   imageUrl: string | null;
   isAvailable: boolean;
+  section: "menu" | "market";
 };
 
 export type CartLine = {
@@ -61,6 +65,7 @@ export function mapCategories(rows: DbCategory[] | null): Category[] {
     nameId: row.name_id,
     emoji: row.emoji ?? "🍽️",
     sortOrder: row.sort_order,
+    section: row.section === "market" ? "market" : "menu",
   }));
 }
 
@@ -77,6 +82,7 @@ export function mapProducts(rows: DbProduct[] | null): Product[] {
     isNew: row.is_new ?? false,
     imageUrl: row.image_url ?? null,
     isAvailable: row.is_available ?? true,
+    section: row.section === "market" ? "market" : "menu",
   }));
 }
 
