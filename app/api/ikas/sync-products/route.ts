@@ -142,17 +142,25 @@ async function runSync() {
       })
       .filter((p): p is NonNullable<typeof p> => p !== null);
 
-    if (productPayloads.length > 0) {
+    // ikas'tan gelen listede aynı ürün (sayfalama örtüşmesi vb. yüzünden)
+    // birden fazla kez görünmüş olabilir. Postgres, tek bir toplu UPSERT
+    // içinde aynı satırı iki kez güncelleyemiyor, o yüzden burada
+    // ikas_variant_id'ye göre tekilleştiriyoruz (son görüleni tutuyoruz).
+    const dedupedPayloads = Array.from(
+      new Map(productPayloads.map((p) => [p.ikas_variant_id, p])).values()
+    );
+
+    if (dedupedPayloads.length > 0) {
       const { error: upsertError } = await supabase
         .from("products")
-        .upsert(productPayloads, { onConflict: "ikas_variant_id" });
+        .upsert(dedupedPayloads, { onConflict: "ikas_variant_id" });
 
       if (upsertError) {
         throw new Error("Ürünler kaydedilemedi: " + upsertError.message);
       }
     }
 
-    return NextResponse.json({ success: true, totalSynced: productPayloads.length });
+    return NextResponse.json({ success: true, totalSynced: dedupedPayloads.length });
   } catch (error) {
     console.error("IKAS SENKRONIZASYON HATASI:", error);
     return NextResponse.json(
