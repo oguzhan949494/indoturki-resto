@@ -108,6 +108,7 @@ function TableMenu() {
     menuSearch: lang === "tr" ? "Menüde ara..." : "Cari di menu...",
     cart: lang === "tr" ? "Sepet" : "Keranjang",
     tableLabel: lang === "tr" ? "Masa" : "Meja",
+    priceCheckButton: lang === "tr" ? "📷 Market Fiyat Gör" : "📷 Lihat Harga Pasar",
     add: lang === "tr" ? "Sepete Ekle" : "Tambah ke keranjang",
     wantSambal: lang === "tr" ? "Sambal sos istiyorum" : "Saya ingin sambal",
     extraPilav: lang === "tr" ? "Ekstra Pilav (150g) +50₺" : "Tambah Nasi (150g) +50₺",
@@ -315,7 +316,7 @@ function TableMenu() {
               href={`/fiyat-sor?masa=${tableNumber}`}
               className="whitespace-nowrap rounded-full border border-[#e4d3c1] bg-white px-4 py-2.5 text-sm font-black text-[#5b4032]"
             >
-              📷 Market Fiyat Gör
+              {tr.priceCheckButton}
             </Link>
             <div className="flex rounded-full border border-[#e4d3c1] bg-white p-1 text-[11px] font-black">
               <button
