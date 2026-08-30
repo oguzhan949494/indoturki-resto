@@ -5,9 +5,10 @@ import { ikasGraphQL } from "@/lib/ikas-client";
 // ikas'tan tüm ürünleri (kategorileriyle, varyant/stok/fiyat bilgisiyle)
 // çeker ve Supabase'e "market" ürünleri olarak kaydeder.
 //
-// NOT: ikas'ın tam GraphQL alan isimleri (özellikle stok/fiyat yapısı)
-// dokümantasyonda dağınık; ilk çalıştırmada bir alan hatası gelirse,
-// hatayı olduğu gibi bize iletin, tek seferde düzeltilir.
+// Performans notu: önceki sürüm her ürün için ayrı ayrı veritabanı
+// sorgusu atıyordu (yavaş, çok ürünlü mağazalarda Vercel'in 10 saniyelik
+// sınırını aşma riski vardı). Bu sürüm önce tüm veriyi ikas'tan toplar,
+// sonra kategorileri ve ürünleri TOPLU (tek sorguda) kaydeder.
 
 const LIST_PRODUCT_QUERY = `
   query ListProducts($page: Int!, $limit: Int!) {
@@ -25,9 +26,6 @@ const LIST_PRODUCT_QUERY = `
           sku
           prices {
             sellPrice
-          }
-          images {
-            imageId
           }
           stocks {
             stockCount
@@ -51,74 +49,82 @@ async function runSync() {
   const supabase = createClient<any, any, any>(supabaseUrl, supabaseAnonKey);
 
   try {
+    // ---------- 1) ikas'tan TÜM ürünleri hafızaya topla (henüz yazmadan) ----------
+    const allIkasProducts: any[] = [];
     let page = 0;
     const limit = 100;
-    let totalSynced = 0;
     let hasMore = true;
-
-    // Bu senkronizasyonda görülen kategori adı -> bizim kategori id'miz eşlemesi
-    const categoryCache = new Map<string, string>();
 
     while (hasMore) {
       const data = await ikasGraphQL<any>(LIST_PRODUCT_QUERY, { page, limit });
       const products = data?.listProduct?.data ?? [];
       const totalCount = data?.listProduct?.count ?? 0;
 
-      for (const product of products) {
-        const categoryName = product.categories?.[0]?.name || "Market Ürünleri";
-        const ikasCategoryId = product.categories?.[0]?.id || null;
+      allIkasProducts.push(...products);
 
-        let categoryId = categoryCache.get(categoryName);
-        if (!categoryId) {
-          const { data: existingCategory } = await supabase
-            .from("categories")
-            .select("id")
-            .eq("source", "ikas")
-            .eq("name_tr", categoryName)
-            .maybeSingle();
+      page += 1;
+      hasMore = page * limit < totalCount && products.length > 0;
+    }
 
-          if (existingCategory) {
-            categoryId = existingCategory.id;
-          } else {
-            const { data: newCategory, error: categoryError } = await supabase
-              .from("categories")
-              .insert({
-                name_tr: categoryName,
-                name_id: categoryName,
-                emoji: "🛒",
-                section: "market",
-                source: "ikas",
-                ikas_category_id: ikasCategoryId,
-                sort_order: 100,
-              })
-              .select("id")
-              .single();
+    // ---------- 2) Gerekli kategori adlarını çıkar ----------
+    const categoryNames = new Set<string>();
+    for (const product of allIkasProducts) {
+      categoryNames.add(product.categories?.[0]?.name || "Market Ürünleri");
+    }
 
-            if (categoryError || !newCategory) {
-              console.error("Kategori oluşturulamadı:", categoryError);
-              continue;
-            }
-            categoryId = newCategory.id;
-          }
-          categoryCache.set(categoryName, categoryId as string);
-        }
+    // Var olan ikas kategorilerini TEK sorguda çek
+    const { data: existingCategories } = await supabase
+      .from("categories")
+      .select("id, name_tr")
+      .eq("source", "ikas");
 
+    const categoryNameToId = new Map<string, string>();
+    for (const cat of existingCategories ?? []) {
+      categoryNameToId.set(cat.name_tr, cat.id);
+    }
+
+    // Eksik kategorileri TEK seferde toplu ekle
+    const missingCategoryNames = [...categoryNames].filter((name) => !categoryNameToId.has(name));
+    if (missingCategoryNames.length > 0) {
+      const { data: insertedCategories, error: insertCategoryError } = await supabase
+        .from("categories")
+        .insert(
+          missingCategoryNames.map((name) => ({
+            name_tr: name,
+            name_id: name,
+            emoji: "🛒",
+            section: "market",
+            source: "ikas",
+            sort_order: 100,
+          }))
+        )
+        .select("id, name_tr");
+
+      if (insertCategoryError) {
+        throw new Error("Kategori oluşturulamadı: " + insertCategoryError.message);
+      }
+      for (const cat of insertedCategories ?? []) {
+        categoryNameToId.set(cat.name_tr, cat.id);
+      }
+    }
+
+    // ---------- 3) Ürünleri TEK seferde toplu kaydet (upsert) ----------
+    const productPayloads = allIkasProducts
+      .map((product) => {
         const variant = product.variants?.[0];
-        if (!variant) continue;
+        if (!variant) return null;
+
+        const categoryName = product.categories?.[0]?.name || "Market Ürünleri";
+        const categoryId = categoryNameToId.get(categoryName);
+        if (!categoryId) return null;
 
         const price = Number(variant.prices?.sellPrice ?? 0);
-        const stock = variant.stocks?.reduce(
+        const stock = (variant.stocks ?? []).reduce(
           (sum: number, s: any) => sum + (Number(s.stockCount) || 0),
           0
         );
 
-        const { data: existingProduct } = await supabase
-          .from("products")
-          .select("id")
-          .eq("ikas_variant_id", variant.id)
-          .maybeSingle();
-
-        const productPayload = {
+        return {
           category_id: categoryId,
           name_tr: product.name,
           name_id: product.name,
@@ -133,21 +139,20 @@ async function runSync() {
           is_available: stock > 0,
           sort_order: 100,
         };
+      })
+      .filter((p): p is NonNullable<typeof p> => p !== null);
 
-        if (existingProduct) {
-          await supabase.from("products").update(productPayload).eq("id", existingProduct.id);
-        } else {
-          await supabase.from("products").insert(productPayload);
-        }
+    if (productPayloads.length > 0) {
+      const { error: upsertError } = await supabase
+        .from("products")
+        .upsert(productPayloads, { onConflict: "ikas_variant_id" });
 
-        totalSynced += 1;
+      if (upsertError) {
+        throw new Error("Ürünler kaydedilemedi: " + upsertError.message);
       }
-
-      page += 1;
-      hasMore = page * limit < totalCount;
     }
 
-    return NextResponse.json({ success: true, totalSynced });
+    return NextResponse.json({ success: true, totalSynced: productPayloads.length });
   } catch (error) {
     console.error("IKAS SENKRONIZASYON HATASI:", error);
     return NextResponse.json(
