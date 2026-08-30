@@ -150,84 +150,98 @@ export default function SiparisPanelPage() {
   }
 
   return (
-    <div style={{ minHeight: "100vh", background: "#0f1115", color: "#f2f2f2", padding: 20, fontFamily: "-apple-system, Segoe UI, Roboto, Arial, sans-serif" }}>
-      <style>{`
-        @media print {
-          body * { visibility: hidden; }
-          #yazdirma-tekli, #yazdirma-tekli *,
-          #yazdirma-tumu, #yazdirma-tumu * { visibility: visible; }
-          #yazdirma-tekli { position: absolute; top: 0; left: 0; width: 70mm; }
-          #yazdirma-tumu { position: absolute; top: 0; left: 0; width: 100%; }
-          @page { size: A4 portrait; margin: 8mm; }
-          .fis-sayfasi { display: flex; page-break-after: always; }
-          .fis-sayfasi:last-child { page-break-after: auto; }
-          .fis-sutun { width: 63mm; padding: 0 4mm; border-right: 1px dashed #999; }
-          .fis-sutun:last-child { border-right: none; }
-        }
-      `}</style>
+    <>
+      {/*
+        DÜZELTME: Önceki sürüm "visibility: hidden" kullanıyordu — bu,
+        elemanları görünmez yapar ama sayfadaki YERLERİNİ boş bırakmaz.
+        Bu da fişin "position: absolute" ile konumlandırılmasını tarayıcıya
+        göre değişken/güvenilmez hale getiriyordu (ortada basma sorunu
+        buradan kaynaklanıyordu). Şimdi ekran içeriğini yazdırırken
+        TAMAMEN kaldırıyoruz (display:none) ve fiş içeriğini normal sayfa
+        akışında gösteriyoruz — böylece otomatik olarak sayfanın en
+        üstünden başlıyor, mutlak konumlandırmaya hiç gerek kalmıyor.
+      */}
+      <div
+        className="ekran-icerigi"
+        style={{ minHeight: "100vh", background: "#0f1115", color: "#f2f2f2", padding: 20, fontFamily: "-apple-system, Segoe UI, Roboto, Arial, sans-serif" }}
+      >
+        <style>{`
+          @media print {
+            .ekran-icerigi { display: none !important; }
+          }
+        `}</style>
 
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
-        <h1 style={{ fontSize: "1.3rem", margin: 0 }}>📋 Yeni Siparişler ({siparisler.length})</h1>
-        <button
-          onClick={tumunuYazdirVeIsaretle}
-          disabled={siparisler.length === 0}
-          style={{
-            padding: "10px 18px",
-            borderRadius: 8,
-            border: "none",
-            background: siparisler.length === 0 ? "#2a2d36" : "#22c55e",
-            color: siparisler.length === 0 ? "#6b7280" : "#fff",
-            fontWeight: 600,
-            cursor: siparisler.length === 0 ? "not-allowed" : "pointer",
-          }}
-        >
-          🖨️ Tümünü Yazdır ({siparisler.length})
-        </button>
-      </div>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+          <h1 style={{ fontSize: "1.3rem", margin: 0 }}>📋 Yeni Siparişler ({siparisler.length})</h1>
+          <button
+            onClick={tumunuYazdirVeIsaretle}
+            disabled={siparisler.length === 0}
+            style={{
+              padding: "10px 18px",
+              borderRadius: 8,
+              border: "none",
+              background: siparisler.length === 0 ? "#2a2d36" : "#22c55e",
+              color: siparisler.length === 0 ? "#6b7280" : "#fff",
+              fontWeight: 600,
+              cursor: siparisler.length === 0 ? "not-allowed" : "pointer",
+            }}
+          >
+            🖨️ Tümünü Yazdır ({siparisler.length})
+          </button>
+        </div>
 
-      {siparisler.length === 0 && (
-        <div style={{ color: "#6b7280" }}>Bekleyen sipariş yok. Otomatik yenileniyor…</div>
-      )}
+        {siparisler.length === 0 && (
+          <div style={{ color: "#6b7280" }}>Bekleyen sipariş yok. Otomatik yenileniyor…</div>
+        )}
 
-      <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-        {siparisler.map((s) => (
-          <div key={s.id} style={{ background: "#1a1d24", border: "1px solid #2a2d36", borderRadius: 12, padding: 16 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
-              <strong>Sipariş #{s.siparis_no}</strong>
-              <span style={{ color: "#9aa0ab" }}>{s.musteri_adi}</span>
-            </div>
-            <ul style={{ margin: "8px 0", paddingLeft: 18, color: "#c8cbd2" }}>
-              {s.urunler.map((u, i) => (
-                <li key={i}>
-                  {u.adet}x {u.ad} — {Number(u.fiyat).toFixed(2)} ₺
-                </li>
-              ))}
-            </ul>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 10 }}>
-              <strong>Toplam: {Number(s.toplam_tutar).toFixed(2)} ₺</strong>
-              <div style={{ display: "flex", gap: 8 }}>
-                <button
-                  onClick={() => yazdirVeIsaretle(s)}
-                  style={{ padding: "10px 18px", borderRadius: 8, border: "none", background: "#3a7bfd", color: "#fff", fontWeight: 600, cursor: "pointer" }}
-                >
-                  🖨️ Yazdır
-                </button>
-                <button
-                  onClick={() => siparisiSil(s)}
-                  style={{ padding: "10px 14px", borderRadius: 8, border: "1px solid #ff6b6b", background: "transparent", color: "#ff6b6b", fontWeight: 600, cursor: "pointer" }}
-                >
-                  🗑️ Sil
-                </button>
+        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          {siparisler.map((s) => (
+            <div key={s.id} style={{ background: "#1a1d24", border: "1px solid #2a2d36", borderRadius: 12, padding: 16 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
+                <strong>Sipariş #{s.siparis_no}</strong>
+                <span style={{ color: "#9aa0ab" }}>{s.musteri_adi}</span>
+              </div>
+              <ul style={{ margin: "8px 0", paddingLeft: 18, color: "#c8cbd2" }}>
+                {s.urunler.map((u, i) => (
+                  <li key={i}>
+                    {u.adet}x {u.ad} — {Number(u.fiyat).toFixed(2)} ₺
+                  </li>
+                ))}
+              </ul>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 10 }}>
+                <strong>Toplam: {Number(s.toplam_tutar).toFixed(2)} ₺</strong>
+                <div style={{ display: "flex", gap: 8 }}>
+                  <button
+                    onClick={() => yazdirVeIsaretle(s)}
+                    style={{ padding: "10px 18px", borderRadius: 8, border: "none", background: "#3a7bfd", color: "#fff", fontWeight: 600, cursor: "pointer" }}
+                  >
+                    🖨️ Yazdır
+                  </button>
+                  <button
+                    onClick={() => siparisiSil(s)}
+                    style={{ padding: "10px 14px", borderRadius: 8, border: "1px solid #ff6b6b", background: "transparent", color: "#ff6b6b", fontWeight: 600, cursor: "pointer" }}
+                  >
+                    🗑️ Sil
+                  </button>
+                </div>
               </div>
             </div>
-          </div>
-        ))}
+          ))}
+        </div>
       </div>
 
-      {/* Tekli yazdırma alanı */}
+      {/* Tekli yazdırma alanı — ekranda hiç görünmez, sadece yazdırmada belirir */}
       {yazdirilacak && (
         <div id="yazdirma-tekli" style={{ display: "none" }}>
-          <style>{`@media print { #yazdirma-tekli { display: block !important; } }`}</style>
+          <style>{`
+            @media print {
+              #yazdirma-tekli {
+                display: block !important;
+                width: 70mm;
+              }
+              @page { size: A4 portrait; margin: 8mm; }
+            }
+          `}</style>
           <FisIcerigi siparis={yazdirilacak} />
         </div>
       )}
@@ -235,7 +249,19 @@ export default function SiparisPanelPage() {
       {/* Toplu yazdırma alanı — 3'erli sayfalara bölünmüş, A4 dikey yan yana */}
       {tumunuYazdir && (
         <div id="yazdirma-tumu" style={{ display: "none" }}>
-          <style>{`@media print { #yazdirma-tumu { display: block !important; } }`}</style>
+          <style>{`
+            @media print {
+              #yazdirma-tumu {
+                display: block !important;
+                width: 100%;
+              }
+              @page { size: A4 portrait; margin: 8mm; }
+              .fis-sayfasi { display: flex; page-break-after: always; }
+              .fis-sayfasi:last-child { page-break-after: auto; }
+              .fis-sutun { width: 63mm; padding: 0 4mm; border-right: 1px dashed #999; }
+              .fis-sutun:last-child { border-right: none; }
+            }
+          `}</style>
           {sayfalaraBol(tumunuYazdir).map((sayfa, i) => (
             <div key={i} className="fis-sayfasi">
               {sayfa.map((s) => (
@@ -247,6 +273,6 @@ export default function SiparisPanelPage() {
           ))}
         </div>
       )}
-    </div>
+    </>
   );
 }
