@@ -16,7 +16,7 @@ import { ikasGraphQL } from "@/lib/ikas-client";
 const IKAS_STORE_ASSET_ID = "aeb81354-e524-4178-8a56-7b8d7eda742d";
 
 function buildIkasImageUrl(imageId: string) {
-  return `https://cdn.myikas.com/images/${IKAS_STORE_ASSET_ID}/${imageId}/image_600.webp`;
+  return `https://cdn.myikas.com/images/${IKAS_STORE_ASSET_ID}/${imageId}/image_2560.webp`;
 }
 
 const LIST_PRODUCT_QUERY = `
