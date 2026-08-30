@@ -19,6 +19,19 @@ export default function ProductImagesPage() {
   const [errorId, setErrorId] = useState<string | null>(null);
   const [syncing, setSyncing] = useState(false);
   const [syncResult, setSyncResult] = useState<string | null>(null);
+  const [yeniUrunAcik, setYeniUrunAcik] = useState(false);
+  const [yeniUrun, setYeniUrun] = useState({
+    name_tr: "",
+    name_id: "",
+    description_tr: "",
+    description_id: "",
+    price_tl: "",
+    category_id: "",
+    spicy_level: "0",
+    is_new: false,
+  });
+  const [kaydediliyor, setKaydediliyor] = useState(false);
+  const [draggedId, setDraggedId] = useState<string | null>(null);
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -173,6 +186,90 @@ export default function ProductImagesPage() {
     }
   };
 
+  const yeniUrunKaydet = async () => {
+    if (!yeniUrun.name_tr.trim() || !yeniUrun.price_tl || !yeniUrun.category_id) {
+      alert("Ürün adı, fiyat ve kategori zorunludur.");
+      return;
+    }
+
+    setKaydediliyor(true);
+
+    const kategoriUrunleri = products.filter((p) => p.categoryId === yeniUrun.category_id);
+    const maxSort =
+      kategoriUrunleri.length > 0 ? Math.max(...kategoriUrunleri.map((p) => p.sortOrder)) : 0;
+
+    const { error } = await supabase.from("products").insert({
+      category_id: yeniUrun.category_id,
+      name_tr: yeniUrun.name_tr.trim(),
+      name_id: yeniUrun.name_id.trim() || yeniUrun.name_tr.trim(),
+      description_tr: yeniUrun.description_tr.trim() || "",
+      description_id: yeniUrun.description_id.trim() || yeniUrun.description_tr.trim() || "",
+      price_tl: Number(yeniUrun.price_tl),
+      spicy_level: Number(yeniUrun.spicy_level) || 0,
+      is_new: yeniUrun.is_new,
+      is_available: true,
+      section: "menu",
+      source: "manual",
+      sort_order: maxSort + 10,
+    });
+
+    setKaydediliyor(false);
+
+    if (error) {
+      console.error("Ürün eklenemedi:", error);
+      alert("Ürün eklenemedi. Tekrar deneyin.");
+      return;
+    }
+
+    setYeniUrunAcik(false);
+    setYeniUrun({
+      name_tr: "",
+      name_id: "",
+      description_tr: "",
+      description_id: "",
+      price_tl: "",
+      category_id: "",
+      spicy_level: "0",
+      is_new: false,
+    });
+    loadData();
+  };
+
+  const surukleBasla = (id: string) => setDraggedId(id);
+
+  const surukleUzerine = (e: React.DragEvent) => e.preventDefault();
+
+  const birak = async (hedefId: string, categoryId: string) => {
+    if (!draggedId || draggedId === hedefId) return;
+
+    const kategoriUrunleri = products
+      .filter((p) => p.categoryId === categoryId)
+      .sort((a, b) => a.sortOrder - b.sortOrder);
+
+    const suruklenenIndex = kategoriUrunleri.findIndex((p) => p.id === draggedId);
+    const hedefIndex = kategoriUrunleri.findIndex((p) => p.id === hedefId);
+    if (suruklenenIndex === -1 || hedefIndex === -1) return;
+
+    const yenidenSirali = [...kategoriUrunleri];
+    const [tasinan] = yenidenSirali.splice(suruklenenIndex, 1);
+    yenidenSirali.splice(hedefIndex, 0, tasinan);
+
+    const guncellemeler = yenidenSirali.map((p, i) => ({ id: p.id, sort_order: (i + 1) * 10 }));
+
+    setProducts((current) =>
+      current.map((p) => {
+        const u = guncellemeler.find((x) => x.id === p.id);
+        return u ? { ...p, sortOrder: u.sort_order } : p;
+      })
+    );
+
+    setDraggedId(null);
+
+    for (const u of guncellemeler) {
+      await supabase.from("products").update({ sort_order: u.sort_order }).eq("id", u.id);
+    }
+  };
+
   return (
     <main className="min-h-screen bg-[#f3f1ed] text-[#231710]">
       <header className="sticky top-0 z-20 border-b border-[#e2ddd3] bg-white px-4 py-4 sm:px-8">
@@ -184,6 +281,12 @@ export default function ProductImagesPage() {
             </p>
           </div>
           <div className="flex items-center gap-2">
+            <button
+              onClick={() => setYeniUrunAcik(true)}
+              className="rounded-full bg-[#ef2b1e] px-4 py-2 text-xs font-bold text-white"
+            >
+              + Yeni Ürün Ekle
+            </button>
             <button
               onClick={syncMarketProducts}
               disabled={syncing}
@@ -211,7 +314,9 @@ export default function ProductImagesPage() {
           <p className="text-center font-bold text-[#7a6f63]">Yükleniyor...</p>
         ) : (
           categories.map((category) => {
-            const categoryProducts = products.filter((p) => p.categoryId === category.id);
+            const categoryProducts = products
+              .filter((p) => p.categoryId === category.id)
+              .sort((a, b) => a.sortOrder - b.sortOrder);
             if (categoryProducts.length === 0) return null;
 
             return (
@@ -223,10 +328,19 @@ export default function ProductImagesPage() {
                   {categoryProducts.map((product) => (
                     <div
                       key={product.id}
+                      draggable={product.section === "menu"}
+                      onDragStart={() => surukleBasla(product.id)}
+                      onDragOver={surukleUzerine}
+                      onDrop={() => birak(product.id, category.id)}
                       className={`rounded-2xl border border-[#e2ddd3] bg-white p-3 transition ${
                         product.isAvailable ? "" : "opacity-50"
+                      } ${product.section === "menu" ? "cursor-move" : ""} ${
+                        draggedId === product.id ? "opacity-30" : ""
                       }`}
                     >
+                      {product.section === "menu" && (
+                        <div className="mb-1 text-center text-xs text-[#c9beae]">⠿⠿⠿</div>
+                      )}
                       <div className="mb-3 flex h-32 items-center justify-center overflow-hidden rounded-xl bg-[#f7eee3]">
                         {product.imageUrl ? (
                           // eslint-disable-next-line @next/next/no-img-element
@@ -325,6 +439,117 @@ export default function ProductImagesPage() {
           })
         )}
       </section>
+
+      {yeniUrunAcik && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 p-4 sm:items-center">
+          <div className="max-h-[85vh] w-full max-w-md overflow-y-auto rounded-3xl bg-white p-5 shadow-2xl">
+            <div className="mb-4 flex items-center justify-between">
+              <h3 className="text-lg font-black">Yeni Ürün Ekle</h3>
+              <button
+                onClick={() => setYeniUrunAcik(false)}
+                className="rounded-full border border-[#e4d3c1] px-3 py-1.5 text-sm font-bold"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="space-y-3">
+              <div>
+                <label className="text-xs font-bold text-[#7a6f63]">Kategori *</label>
+                <select
+                  value={yeniUrun.category_id}
+                  onChange={(e) => setYeniUrun((u) => ({ ...u, category_id: e.target.value }))}
+                  className="mt-1 w-full rounded-xl border border-[#e5d4c2] px-3 py-2 text-sm outline-none focus:border-[#ef2b1e]"
+                >
+                  <option value="">Seçiniz...</option>
+                  {categories
+                    .filter((c) => c.section === "menu")
+                    .map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.emoji} {c.nameTr}
+                      </option>
+                    ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="text-xs font-bold text-[#7a6f63]">Ürün Adı (Türkçe) *</label>
+                <input
+                  value={yeniUrun.name_tr}
+                  onChange={(e) => setYeniUrun((u) => ({ ...u, name_tr: e.target.value }))}
+                  className="mt-1 w-full rounded-xl border border-[#e5d4c2] px-3 py-2 text-sm outline-none focus:border-[#ef2b1e]"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-bold text-[#7a6f63]">
+                  Ürün Adı (Endonezce) — boş bırakılırsa Türkçe adı kullanılır
+                </label>
+                <input
+                  value={yeniUrun.name_id}
+                  onChange={(e) => setYeniUrun((u) => ({ ...u, name_id: e.target.value }))}
+                  className="mt-1 w-full rounded-xl border border-[#e5d4c2] px-3 py-2 text-sm outline-none focus:border-[#ef2b1e]"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-bold text-[#7a6f63]">Açıklama (Türkçe)</label>
+                <textarea
+                  value={yeniUrun.description_tr}
+                  onChange={(e) => setYeniUrun((u) => ({ ...u, description_tr: e.target.value }))}
+                  rows={2}
+                  className="mt-1 w-full rounded-xl border border-[#e5d4c2] px-3 py-2 text-sm outline-none focus:border-[#ef2b1e]"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-bold text-[#7a6f63]">Fiyat (TL) *</label>
+                <input
+                  type="number"
+                  min={0}
+                  value={yeniUrun.price_tl}
+                  onChange={(e) => setYeniUrun((u) => ({ ...u, price_tl: e.target.value }))}
+                  className="mt-1 w-full rounded-xl border border-[#e5d4c2] px-3 py-2 text-sm outline-none focus:border-[#ef2b1e]"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-bold text-[#7a6f63]">Acılık Seviyesi</label>
+                <select
+                  value={yeniUrun.spicy_level}
+                  onChange={(e) => setYeniUrun((u) => ({ ...u, spicy_level: e.target.value }))}
+                  className="mt-1 w-full rounded-xl border border-[#e5d4c2] px-3 py-2 text-sm outline-none focus:border-[#ef2b1e]"
+                >
+                  <option value="0">Acısız</option>
+                  <option value="1">🌶️ 1</option>
+                  <option value="2">🌶️ 2</option>
+                  <option value="3">🌶️ 3</option>
+                  <option value="4">🌶️ 4</option>
+                  <option value="5">🌶️ 5</option>
+                </select>
+              </div>
+
+              <label className="flex items-center gap-2 text-sm font-bold">
+                <input
+                  type="checkbox"
+                  checked={yeniUrun.is_new}
+                  onChange={(e) => setYeniUrun((u) => ({ ...u, is_new: e.target.checked }))}
+                  className="h-4 w-4"
+                />
+                "Yeni" rozeti göster
+              </label>
+            </div>
+
+            <button
+              onClick={yeniUrunKaydet}
+              disabled={kaydediliyor}
+              className="mt-5 w-full rounded-2xl bg-[#231710] py-3 text-sm font-black text-white disabled:opacity-50"
+            >
+              {kaydediliyor ? "Kaydediliyor..." : "Ürünü Kaydet"}
+            </button>
+          </div>
+        </div>
+      )}
     </main>
   );
 }

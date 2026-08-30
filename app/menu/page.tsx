@@ -175,15 +175,23 @@ function TableMenu() {
 
   const visibleProducts = useMemo(() => {
     const q = search.trim().toLocaleLowerCase("tr-TR");
-    return products.filter((product) => {
-      const categoryMatch =
-        activeCategory === ALL_CATEGORY_ID || product.categoryId === activeCategory;
-      const name = productName(product).toLocaleLowerCase("tr-TR");
-      const searchMatch = !q || name.includes(q);
-      return categoryMatch && searchMatch;
-    });
+    const categorySortMap = new Map(categories.map((c) => [c.id, c.sortOrder]));
+    return products
+      .filter((product) => {
+        const categoryMatch =
+          activeCategory === ALL_CATEGORY_ID || product.categoryId === activeCategory;
+        const name = productName(product).toLocaleLowerCase("tr-TR");
+        const searchMatch = !q || name.includes(q);
+        return categoryMatch && searchMatch;
+      })
+      .sort((a, b) => {
+        const catA = categorySortMap.get(a.categoryId) ?? 0;
+        const catB = categorySortMap.get(b.categoryId) ?? 0;
+        if (catA !== catB) return catA - catB;
+        return a.sortOrder - b.sortOrder;
+      });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeCategory, search, products, lang]);
+  }, [activeCategory, search, products, lang, categories]);
 
   // Stok takibi olan ürünlerde (menü ya da market fark etmez), stoktan
   // fazlası sepete eklenemez. Stok takibi yoksa (stockQuantity boş) sınırsız.

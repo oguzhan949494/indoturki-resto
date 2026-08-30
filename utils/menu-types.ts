@@ -47,6 +47,7 @@ export type Product = {
   isAvailable: boolean;
   section: "menu" | "market";
   stockQuantity: number | null;
+  sortOrder: number;
 };
 
 export type CartLine = {
@@ -86,6 +87,7 @@ export function mapProducts(rows: DbProduct[] | null): Product[] {
     isAvailable: row.is_available ?? true,
     section: row.section === "market" ? "market" : "menu",
     stockQuantity: row.stock_quantity ?? null,
+    sortOrder: row.sort_order,
   }));
 }
 

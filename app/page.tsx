@@ -276,17 +276,27 @@ export default function Home() {
 
   const visibleProducts = useMemo(() => {
     const q = search.trim().toLocaleLowerCase("tr-TR");
-    return products.filter((product) => {
-      const sectionMatch = product.section === menuSection;
-      const categoryMatch =
-        activeCategory === ALL_CATEGORY_ID || product.categoryId === activeCategory;
-      const name = productName(product).toLocaleLowerCase("tr-TR");
-      const desc = productDescription(product).toLocaleLowerCase("tr-TR");
-      const searchMatch = !q || name.includes(q) || desc.includes(q);
-      return sectionMatch && categoryMatch && searchMatch;
-    });
+    const categorySortMap = new Map(categories.map((c) => [c.id, c.sortOrder]));
+    return products
+      .filter((product) => {
+        const sectionMatch = product.section === menuSection;
+        const categoryMatch =
+          activeCategory === ALL_CATEGORY_ID || product.categoryId === activeCategory;
+        const name = productName(product).toLocaleLowerCase("tr-TR");
+        const desc = productDescription(product).toLocaleLowerCase("tr-TR");
+        const searchMatch = !q || name.includes(q) || desc.includes(q);
+        return sectionMatch && categoryMatch && searchMatch;
+      })
+      .sort((a, b) => {
+        // "Tümü" seçiliyken önce kategoriye göre grupla, sonra kategori
+        // içindeki sıraya göre diz.
+        const catA = categorySortMap.get(a.categoryId) ?? 0;
+        const catB = categorySortMap.get(b.categoryId) ?? 0;
+        if (catA !== catB) return catA - catB;
+        return a.sortOrder - b.sortOrder;
+      });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeCategory, search, products, lang, menuSection]);
+  }, [activeCategory, search, products, lang, menuSection, categories]);
 
   const visibleCategories = useMemo(
     () => categories.filter((category) => category.section === menuSection),
