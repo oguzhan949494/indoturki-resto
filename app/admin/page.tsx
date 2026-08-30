@@ -73,6 +73,73 @@ function timeAgo(iso: string) {
   return `${hrs} sa önce`;
 }
 
+const ORDER_SOURCE_LABEL: Record<string, string> = {
+  delivery: "🚚 Paket Servis",
+  pickup: "🏃 Gel Al",
+  dinein: "🍽️ Restoranda Yiyor",
+  table: "🍽️ Masa",
+};
+
+// Mutfak fişi — sadece yazdırırken görünür, ekranda hiç gösterilmez.
+function MutfakFisi({ order }: { order: OrderRow }) {
+  const kaynakYazi =
+    order.source === "table"
+      ? `🍽️ Masa ${order.restaurant_tables?.table_number ?? "?"}`
+      : ORDER_SOURCE_LABEL[order.source] ?? order.source;
+
+  return (
+    <div style={{ fontFamily: "Arial, sans-serif", color: "#000", fontSize: 12, lineHeight: 1.5 }}>
+      <div style={{ textAlign: "center", marginBottom: 8 }}>
+        <div style={{ fontWeight: 700, fontSize: 16 }}>INDOTURKI RESTO</div>
+        <div style={{ fontSize: 11 }}>MUTFAK FİŞİ</div>
+      </div>
+      <p style={{ margin: 0, fontWeight: 700 }}>ID-{order.order_number}</p>
+      <p style={{ margin: 0 }}>{kaynakYazi}</p>
+      <p style={{ margin: 0 }}>{new Date(order.created_at).toLocaleString("tr-TR")}</p>
+
+      {order.source !== "table" && (
+        <div style={{ marginTop: 6 }}>
+          <p style={{ margin: 0, fontWeight: 700 }}>{order.customer_name}</p>
+          <p style={{ margin: 0 }}>{order.customer_phone}</p>
+        </div>
+      )}
+
+      {order.source === "delivery" && (
+        <div style={{ marginTop: 4 }}>
+          <p style={{ margin: 0 }}>{order.delivery_address}</p>
+          {order.leave_at_reception && (
+            <p style={{ margin: 0, fontWeight: 700 }}>🏨 Resepsiyona bırakılacak</p>
+          )}
+          {order.delivery_note && <p style={{ margin: 0 }}>Not: {order.delivery_note}</p>}
+        </div>
+      )}
+
+      <div style={{ borderTop: "1px dashed #000", borderBottom: "1px dashed #000", padding: "6px 0", marginTop: 8 }}>
+        {order.order_items.map((item) => (
+          <div key={item.id} style={{ marginBottom: 4 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", fontWeight: 700 }}>
+              <span>
+                {item.quantity}x {item.product_name_tr}
+              </span>
+            </div>
+            {item.options && item.options.length > 0 && (
+              <div style={{ fontSize: 11 }}>
+                {item.options.map((code) => `• ${OPTION_LABELS[code]?.tr ?? code}`).join("  ")}
+              </div>
+            )}
+            {item.item_note && <div style={{ fontSize: 11, fontStyle: "italic" }}>📝 {item.item_note}</div>}
+          </div>
+        ))}
+      </div>
+
+      <div style={{ display: "flex", justifyContent: "space-between", fontWeight: 700, marginTop: 6, fontSize: 13 }}>
+        <span>Toplam</span>
+        <span>{order.total_tl.toLocaleString("tr-TR")} TL</span>
+      </div>
+    </div>
+  );
+}
+
 export default function AdminPage() {
   const supabase = createClient();
   const router = useRouter();
@@ -81,6 +148,7 @@ export default function AdminPage() {
   const [calls, setCalls] = useState<StaffCallRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [soundOn, setSoundOn] = useState(true);
+  const [printingOrder, setPrintingOrder] = useState<OrderRow | null>(null);
 
   const loadOrders = useCallback(async () => {
     const { data, error } = await supabase
@@ -186,6 +254,16 @@ export default function AdminPage() {
     if (error) console.error(error);
   };
 
+  // Mutfak fişini yazdırır — arka planda görünmez alanı doldurur,
+  // tarayıcının yazdırma diyaloğunu açar.
+  const yazdir = (order: OrderRow) => {
+    setPrintingOrder(order);
+    setTimeout(() => {
+      window.print();
+      setPrintingOrder(null);
+    }, 150);
+  };
+
   const markPaid = async (order: OrderRow) => {
     const res = await fetch("/api/ikas/mark-paid", {
       method: "POST",
@@ -214,7 +292,8 @@ export default function AdminPage() {
   };
 
   return (
-    <main className="min-h-screen bg-[#f3f1ed] text-[#231710]">
+    <>
+    <main className="ekran-icerigi min-h-screen bg-[#f3f1ed] text-[#231710]">
       <header className="sticky top-0 z-20 border-b border-[#e2ddd3] bg-white px-4 py-4 sm:px-8">
         <div className="mx-auto flex max-w-5xl items-center justify-between">
           <div>
@@ -410,6 +489,12 @@ export default function AdminPage() {
                     <span className="rounded-full bg-[#f3f1ed] px-3 py-1.5 text-xs font-black">
                       {ORDER_STATUS_LABEL[order.order_status] ?? order.order_status}
                     </span>
+                    <button
+                      onClick={() => yazdir(order)}
+                      className="rounded-full border border-[#231710] px-4 py-1.5 text-xs font-bold text-[#231710]"
+                    >
+                      🖨️ Yazdır
+                    </button>
                     {order.order_status !== "completed" && (
                       <button
                         onClick={() => advanceOrderStatus(order)}
@@ -460,5 +545,21 @@ export default function AdminPage() {
         )}
       </section>
     </main>
+
+    {/* Mutfak fişi yazdırma alanı — ekranda hiç görünmez, sadece
+        yazdırmada belirir. Kağıt boyutu, fiş yazıcısıyla aynı: 102x152mm. */}
+    {printingOrder && (
+      <div id="mutfak-fisi-yazdirma" style={{ display: "none" }}>
+        <style>{`
+          @media print {
+            .ekran-icerigi { display: none !important; }
+            #mutfak-fisi-yazdirma { display: block !important; }
+            @page { size: 102mm 152mm; margin: 5mm; }
+          }
+        `}</style>
+        <MutfakFisi order={printingOrder} />
+      </div>
+    )}
+    </>
   );
 }
