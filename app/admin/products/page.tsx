@@ -168,6 +168,44 @@ export default function ProductImagesPage() {
     }
   };
 
+  const urunAdiGuncelle = async (product: Product, deger: string) => {
+    const yeniAd = deger.trim();
+    if (!yeniAd || yeniAd === product.nameTr) return;
+
+    setProducts((current) =>
+      current.map((p) => (p.id === product.id ? { ...p, nameTr: yeniAd } : p))
+    );
+
+    const { error } = await supabase
+      .from("products")
+      .update({ name_tr: yeniAd })
+      .eq("id", product.id);
+
+    if (error) {
+      console.error("Ürün adı güncellenemedi:", error);
+      setErrorId(product.id);
+    }
+  };
+
+  const fiyatGuncelle = async (product: Product, deger: string) => {
+    const yeniFiyat = Number(deger);
+    if (!deger || isNaN(yeniFiyat) || yeniFiyat < 0 || yeniFiyat === product.price) return;
+
+    setProducts((current) =>
+      current.map((p) => (p.id === product.id ? { ...p, price: yeniFiyat } : p))
+    );
+
+    const { error } = await supabase
+      .from("products")
+      .update({ price_tl: yeniFiyat })
+      .eq("id", product.id);
+
+    if (error) {
+      console.error("Fiyat güncellenemedi:", error);
+      setErrorId(product.id);
+    }
+  };
+
   const stokMiktariGuncelle = async (product: Product, deger: string) => {
     const sayi = deger.trim() === "" ? null : Math.max(0, parseInt(deger, 10) || 0);
 
@@ -353,7 +391,32 @@ export default function ProductImagesPage() {
                           <span className="text-4xl opacity-40">🍽️</span>
                         )}
                       </div>
-                      <div className="text-sm font-black">{product.nameTr}</div>
+                      {product.section === "menu" ? (
+                        <div className="space-y-1.5">
+                          <input
+                            defaultValue={product.nameTr}
+                            onBlur={(e) => urunAdiGuncelle(product, e.target.value)}
+                            className="w-full rounded-lg border border-transparent bg-transparent px-1 py-0.5 text-sm font-black outline-none focus:border-[#e5d4c2] focus:bg-white"
+                          />
+                          <div className="flex items-center gap-1">
+                            <input
+                              type="number"
+                              min={0}
+                              defaultValue={product.price}
+                              onBlur={(e) => fiyatGuncelle(product, e.target.value)}
+                              className="w-full rounded-lg border border-[#e5d4c2] px-2 py-1 text-xs font-bold outline-none focus:border-[#ef2b1e]"
+                            />
+                            <span className="text-xs font-bold text-[#a18b7b]">TL</span>
+                          </div>
+                        </div>
+                      ) : (
+                        <div>
+                          <div className="text-sm font-black">{product.nameTr}</div>
+                          <div className="text-xs font-bold text-[#a18b7b]">
+                            {product.price.toLocaleString("tr-TR")} TL
+                          </div>
+                        </div>
+                      )}
 
                       <button
                         onClick={() => toggleAvailability(product)}
