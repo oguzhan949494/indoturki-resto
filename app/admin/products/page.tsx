@@ -168,17 +168,26 @@ export default function ProductImagesPage() {
     }
   };
 
-  const urunAdiGuncelle = async (product: Product, deger: string) => {
+  const urunAdiGuncelle = async (
+    product: Product,
+    alan: "name_tr" | "name_id",
+    deger: string
+  ) => {
     const yeniAd = deger.trim();
-    if (!yeniAd || yeniAd === product.nameTr) return;
+    const mevcut = alan === "name_tr" ? product.nameTr : product.nameId;
+    if (!yeniAd || yeniAd === mevcut) return;
 
     setProducts((current) =>
-      current.map((p) => (p.id === product.id ? { ...p, nameTr: yeniAd } : p))
+      current.map((p) =>
+        p.id === product.id
+          ? { ...p, ...(alan === "name_tr" ? { nameTr: yeniAd } : { nameId: yeniAd }) }
+          : p
+      )
     );
 
     const { error } = await supabase
       .from("products")
-      .update({ name_tr: yeniAd })
+      .update({ [alan]: yeniAd })
       .eq("id", product.id);
 
     if (error) {
@@ -393,11 +402,26 @@ export default function ProductImagesPage() {
                       </div>
                       {product.section === "menu" ? (
                         <div className="space-y-1.5">
-                          <input
-                            defaultValue={product.nameTr}
-                            onBlur={(e) => urunAdiGuncelle(product, e.target.value)}
-                            className="w-full rounded-lg border border-transparent bg-transparent px-1 py-0.5 text-sm font-black outline-none focus:border-[#e5d4c2] focus:bg-white"
-                          />
+                          <div>
+                            <label className="text-[9px] font-bold uppercase text-[#a18b7b]">
+                              Ad (TR)
+                            </label>
+                            <input
+                              defaultValue={product.nameTr}
+                              onBlur={(e) => urunAdiGuncelle(product, "name_tr", e.target.value)}
+                              className="w-full rounded-lg border border-[#e5d4c2] bg-white px-1.5 py-1 text-sm font-black outline-none focus:border-[#ef2b1e]"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-[9px] font-bold uppercase text-[#a18b7b]">
+                              Ad (ID)
+                            </label>
+                            <input
+                              defaultValue={product.nameId}
+                              onBlur={(e) => urunAdiGuncelle(product, "name_id", e.target.value)}
+                              className="w-full rounded-lg border border-[#e5d4c2] bg-white px-1.5 py-1 text-sm font-black outline-none focus:border-[#ef2b1e]"
+                            />
+                          </div>
                           <div className="flex items-center gap-1">
                             <input
                               type="number"
