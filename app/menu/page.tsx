@@ -132,7 +132,6 @@ function TableMenu() {
     menuSearch: lang === "tr" ? "Menüde ara..." : "Cari di menu...",
     cart: lang === "tr" ? "Sepet" : "Keranjang",
     tableLabel: lang === "tr" ? "Masa" : "Meja",
-    priceCheckButton: lang === "tr" ? "📷 Market Fiyat Gör" : "📷 Lihat Harga Pasar",
     add: lang === "tr" ? "Sepete Ekle" : "Tambah ke keranjang",
     wantSambal: lang === "tr" ? "Sambal sos istiyorum" : "Saya ingin sambal",
     extraPilav: lang === "tr" ? "Ekstra Pilav (150g) +50₺" : "Tambah Nasi (150g) +50₺",
@@ -523,8 +522,18 @@ function TableMenu() {
           href={`/fiyat-sor?masa=${tableNumber}`}
           className="flex items-center justify-center gap-2 rounded-2xl bg-white px-4 py-4 text-sm font-black text-[#231710] shadow-[0_18px_45px_rgba(35,23,16,.25)] border border-[#e5d4c2]"
         >
-          <span className="hidden sm:inline">{tr.priceCheckButton}</span>
-          <span className="sm:hidden">📷</span>
+          <svg width="20" height="16" viewBox="0 0 20 16" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+            <rect x="0" y="0" width="1.5" height="16" fill="#231710" />
+            <rect x="2.5" y="0" width="1" height="16" fill="#231710" />
+            <rect x="4.5" y="0" width="2" height="16" fill="#231710" />
+            <rect x="7.5" y="0" width="1" height="16" fill="#231710" />
+            <rect x="9.5" y="0" width="1.5" height="16" fill="#231710" />
+            <rect x="12" y="0" width="1" height="16" fill="#231710" />
+            <rect x="14" y="0" width="2" height="16" fill="#231710" />
+            <rect x="17" y="0" width="1" height="16" fill="#231710" />
+            <rect x="18.5" y="0" width="1.5" height="16" fill="#231710" />
+          </svg>
+          SCANNER
         </Link>
         {cartCount > 0 && !checkoutOpen && (
           <button
