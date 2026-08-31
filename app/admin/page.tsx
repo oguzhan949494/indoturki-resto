@@ -182,7 +182,8 @@ export default function AdminPage() {
 
   const notificationAudioRef = useRef<HTMLAudioElement | null>(null);
 
-  const playPing = useCallback(() => {
+  // Yeni sipariş geldiğinde çalan asıl bildirim sesi.
+  const playNewOrderSound = useCallback(() => {
     if (!soundOn) return;
     try {
       if (!notificationAudioRef.current) {
@@ -199,6 +200,28 @@ export default function AdminPage() {
     }
   }, [soundOn]);
 
+  // Diğer olaylar (personel çağrısı gibi) için kısa, basit bir bip sesi —
+  // ses dosyasına ihtiyaç duymadan tarayıcıda anlık üretiliyor.
+  const playBeep = useCallback(() => {
+    if (!soundOn) return;
+    try {
+      const AudioContextClass =
+        window.AudioContext ||
+        (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+      const ctx = new AudioContextClass();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.frequency.value = 880;
+      gain.gain.setValueAtTime(0.18, ctx.currentTime);
+      osc.start();
+      osc.stop(ctx.currentTime + 0.15);
+    } catch {
+      // sessizce yut
+    }
+  }, [soundOn]);
+
   useEffect(() => {
     setLoading(true);
     Promise.all([loadOrders(), loadCalls()]).finally(() => setLoading(false));
@@ -207,11 +230,21 @@ export default function AdminPage() {
       .channel("admin-orders")
       .on(
         "postgres_changes",
-        { event: "*", schema: "public", table: "orders" },
+        { event: "INSERT", schema: "public", table: "orders" },
         () => {
-          playPing();
+          playNewOrderSound();
           loadOrders();
         }
+      )
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "orders" },
+        () => loadOrders()
+      )
+      .on(
+        "postgres_changes",
+        { event: "DELETE", schema: "public", table: "orders" },
+        () => loadOrders()
       )
       .subscribe();
 
@@ -228,11 +261,16 @@ export default function AdminPage() {
       .channel("admin-staff-calls")
       .on(
         "postgres_changes",
-        { event: "*", schema: "public", table: "staff_calls" },
+        { event: "INSERT", schema: "public", table: "staff_calls" },
         () => {
-          playPing();
+          playBeep();
           loadCalls();
         }
+      )
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "staff_calls" },
+        () => loadCalls()
       )
       .subscribe();
 
