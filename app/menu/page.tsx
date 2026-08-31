@@ -41,7 +41,7 @@ function TableMenu() {
   const masaParam = searchParams.get("masa");
   const tableNumber = masaParam ? Number(masaParam) : null;
 
-  const [lang, setLang] = useState<"tr" | "id">("tr");
+  const [lang, setLang] = useState<"tr" | "id">("id");
   const [categories, setCategories] = useState<Category[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
@@ -362,12 +362,6 @@ function TableMenu() {
           </div>
 
           <div className="flex items-center gap-2">
-            <Link
-              href={`/fiyat-sor?masa=${tableNumber}`}
-              className="whitespace-nowrap rounded-full border border-[#e4d3c1] bg-white px-4 py-2.5 text-sm font-black text-[#5b4032]"
-            >
-              {tr.priceCheckButton}
-            </Link>
             <div className="flex rounded-full border border-[#e4d3c1] bg-white p-1 text-[11px] font-black">
               <button
                 onClick={() => setLang("tr")}
@@ -517,14 +511,21 @@ function TableMenu() {
         )}
       </section>
 
-      {/* Sabit alt bar: sepet özeti + personel çağır */}
-      <div className="fixed bottom-4 left-1/2 z-40 flex w-[calc(100%-24px)] max-w-lg -translate-x-1/2 gap-2">
+      {/* Sabit alt bar: personel çağır + fiyat gör + sepet özeti */}
+      <div className="fixed bottom-4 left-1/2 z-40 flex w-[calc(100%-24px)] max-w-lg gap-2 -translate-x-1/2">
         <button
           onClick={() => setCallOpen(true)}
-          className="flex items-center justify-center gap-2 rounded-2xl bg-white px-5 py-4 text-sm font-black text-[#231710] shadow-[0_18px_45px_rgba(35,23,16,.25)] border border-[#e5d4c2]"
+          className="flex items-center justify-center gap-2 rounded-2xl bg-white px-4 py-4 text-sm font-black text-[#231710] shadow-[0_18px_45px_rgba(35,23,16,.25)] border border-[#e5d4c2]"
         >
-          🔔 {tr.callStaff}
+          🔔 <span className="hidden sm:inline">{tr.callStaff}</span>
         </button>
+        <Link
+          href={`/fiyat-sor?masa=${tableNumber}`}
+          className="flex items-center justify-center gap-2 rounded-2xl bg-white px-4 py-4 text-sm font-black text-[#231710] shadow-[0_18px_45px_rgba(35,23,16,.25)] border border-[#e5d4c2]"
+        >
+          <span className="hidden sm:inline">{tr.priceCheckButton}</span>
+          <span className="sm:hidden">📷</span>
+        </Link>
         {cartCount > 0 && !checkoutOpen && (
           <button
             onClick={() => setCheckoutOpen(true)}

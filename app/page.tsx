@@ -81,7 +81,7 @@ export default function Home() {
   const [menuSection, setMenuSection] = useState<"menu" | "market">("menu");
   const [search, setSearch] = useState("");
   const [cart, setCart] = useState<CartLine[]>([]);
-  const [lang, setLang] = useState<"tr" | "id">("tr");
+  const [lang, setLang] = useState<"tr" | "id">("id");
   const [checkoutOpen, setCheckoutOpen] = useState(false);
   const [orderComplete, setOrderComplete] = useState(false);
   const [submitting, setSubmitting] = useState(false);
