@@ -9,12 +9,14 @@ import {
   ALL_CATEGORY_ID,
   categoryAllowsExtraNoodle,
   categoryIsBeverage,
+  categoryAllowsNoodleTypeChoice,
   categoryAllowsExtraPilav,
   formatTL,
   lineOptionCodes,
   lineUnitPrice,
   mapCategories,
   mapProducts,
+  OPTION_LABELS,
   type CartLine,
   type Category,
   type Product,
@@ -137,6 +139,7 @@ function TableMenu() {
     wantSambal: lang === "tr" ? "Sambal sos istiyorum" : "Saya ingin sambal",
     extraPilav: lang === "tr" ? "Ekstra Pilav (150g) +50₺" : "Tambah Nasi (150g) +50₺",
     extraNoodle: lang === "tr" ? "Ekstra Noodle (75g) +50₺" : "Tambah Mie (75g) +50₺",
+    noodleTypeLabel: lang === "tr" ? "Noodle / Bihun Tercihi" : "Pilihan Mie / Bihun",
     sambalTitle: lang === "tr" ? "Ücretsiz Sambal Sos" : "Sambal Gratis",
     noProduct: lang === "tr" ? "Ürün bulunamadı." : "Produk tidak ditemukan.",
     showMenu: lang === "tr" ? "Menüyü göster" : "Tampilkan menu",
@@ -217,10 +220,20 @@ function TableMenu() {
         alert(lang === "tr" ? "Bu ürün stokta yok." : "Produk ini habis.");
         return current;
       }
-      const isBeverage = categoryIsBeverage(categoryNameForProduct(product));
+      const catName = categoryNameForProduct(product);
+      const isBeverage = categoryIsBeverage(catName);
+      const noodleType = categoryAllowsNoodleTypeChoice(catName) ? "noodle150" : null;
       return [
         ...current,
-        { product, quantity: 1, note: "", sambal: !isBeverage, extraPilav: false, extraNoodle: false },
+        {
+          product,
+          quantity: 1,
+          note: "",
+          sambal: !isBeverage,
+          extraPilav: false,
+          extraNoodle: false,
+          noodleType,
+        },
       ];
     });
   };
@@ -642,6 +655,7 @@ function TableMenu() {
                       const showPilavOption = categoryAllowsExtraPilav(categoryName);
                       const showNoodleOption = categoryAllowsExtraNoodle(categoryName);
                       const showSambalOption = !categoryIsBeverage(categoryName);
+                      const showNoodleTypeChoice = categoryAllowsNoodleTypeChoice(categoryName);
                       return (
                         <div
                           key={line.product.id}
@@ -716,6 +730,30 @@ function TableMenu() {
                                 />
                                 🍜 {tr.extraNoodle}
                               </label>
+                            )}
+                            {showNoodleTypeChoice && (
+                              <div className="rounded-xl bg-[#faf5ee] p-2">
+                                <p className="mb-1 text-[11px] font-black text-[#806b5b]">
+                                  {tr.noodleTypeLabel}
+                                </p>
+                                {(["noodle150", "mix", "bihun150"] as const).map((option) => (
+                                  <label
+                                    key={option}
+                                    className="flex cursor-pointer items-center gap-2 py-0.5 text-xs font-bold"
+                                  >
+                                    <input
+                                      type="radio"
+                                      name={`noodleType-${line.product.id}`}
+                                      checked={line.noodleType === option}
+                                      onChange={() =>
+                                        updateCartLine(line.product.id, { noodleType: option })
+                                      }
+                                      className="h-4 w-4 accent-[#ef2b1e]"
+                                    />
+                                    {OPTION_LABELS[option][lang]}
+                                  </label>
+                                ))}
+                              </div>
                             )}
                           </div>
                         </div>

@@ -50,6 +50,8 @@ export type Product = {
   sortOrder: number;
 };
 
+export type NoodleType = "noodle150" | "mix" | "bihun150";
+
 export type CartLine = {
   product: Product;
   quantity: number;
@@ -57,6 +59,7 @@ export type CartLine = {
   sambal: boolean;
   extraPilav: boolean;
   extraNoodle: boolean;
+  noodleType: NoodleType | null;
 };
 
 export const ALL_CATEGORY_ID = "__all__";
@@ -127,6 +130,12 @@ export function categoryIsBeverage(categoryNameTr: string) {
   return n.includes("coffee") || n.includes("tea") || n.includes("drink");
 }
 
+// Bakso ürünlerinde (Mie Ayam & Bakso kategorisi), noodle/bihun türü
+// tek seçimli (radio) olarak seçilebiliyor.
+export function categoryAllowsNoodleTypeChoice(categoryNameTr: string) {
+  return categoryNameTr.toLowerCase().includes("bakso");
+}
+
 // Bir sepet satırının, seçilen eklentilerle birlikte birim fiyatı.
 export function lineUnitPrice(line: CartLine): number {
   let price = line.product.price;
@@ -141,6 +150,7 @@ export function lineOptionCodes(line: CartLine): string[] {
   if (line.sambal) codes.push("sambal");
   if (line.extraPilav) codes.push("extra_pilav");
   if (line.extraNoodle) codes.push("extra_noodle");
+  if (line.noodleType) codes.push(line.noodleType);
   return codes;
 }
 
@@ -148,4 +158,7 @@ export const OPTION_LABELS: Record<string, { tr: string; id: string }> = {
   sambal: { tr: "🌶️ Sambal sos", id: "🌶️ Sambal" },
   extra_pilav: { tr: "🍚 Ekstra Pilav (150g) +50₺", id: "🍚 Tambah Nasi (150g) +50₺" },
   extra_noodle: { tr: "🍜 Ekstra Noodle (75g) +50₺", id: "🍜 Tambah Mie (75g) +50₺" },
+  noodle150: { tr: "🍜 Noodle 150gr", id: "🍜 Mie 150gr" },
+  mix: { tr: "🍜 Noodle 75gr & Bihun 75gr", id: "🍜 Mie 75gr & Bihun 75gr" },
+  bihun150: { tr: "🍜 Bihun 150gr", id: "🍜 Bihun 150gr" },
 };
