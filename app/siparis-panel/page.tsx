@@ -115,9 +115,7 @@ export default function SiparisPanelPage() {
     setYazdirilacak(siparis);
     setTimeout(async () => {
       window.print();
-      await supabase.from("ikas_siparisler").update({ durum: "yazdirildi" }).eq("id", siparis.id);
       setYazdirilacak(null);
-      siparisleriGetir();
     }, 150);
   }
 
@@ -127,10 +125,7 @@ export default function SiparisPanelPage() {
     setTumunuYazdir(hepsi);
     setTimeout(async () => {
       window.print();
-      const idler = hepsi.map((s) => s.id);
-      await supabase.from("ikas_siparisler").update({ durum: "yazdirildi" }).in("id", idler);
       setTumunuYazdir(null);
-      siparisleriGetir();
     }, 150);
   }
 
