@@ -8,6 +8,7 @@ import Link from "next/link";
 import {
   ALL_CATEGORY_ID,
   categoryAllowsExtraNoodle,
+  categoryIsBeverage,
   categoryAllowsExtraPilav,
   formatTL,
   lineOptionCodes,
@@ -216,9 +217,10 @@ function TableMenu() {
         alert(lang === "tr" ? "Bu ürün stokta yok." : "Produk ini habis.");
         return current;
       }
+      const isBeverage = categoryIsBeverage(categoryNameForProduct(product));
       return [
         ...current,
-        { product, quantity: 1, note: "", sambal: true, extraPilav: false, extraNoodle: false },
+        { product, quantity: 1, note: "", sambal: !isBeverage, extraPilav: false, extraNoodle: false },
       ];
     });
   };
@@ -639,6 +641,7 @@ function TableMenu() {
                       const categoryName = categoryNameForProduct(line.product);
                       const showPilavOption = categoryAllowsExtraPilav(categoryName);
                       const showNoodleOption = categoryAllowsExtraNoodle(categoryName);
+                      const showSambalOption = !categoryIsBeverage(categoryName);
                       return (
                         <div
                           key={line.product.id}
@@ -671,17 +674,19 @@ function TableMenu() {
                           </div>
 
                           <div className="mt-2 space-y-1.5">
-                            <label className="flex cursor-pointer items-center gap-2 text-xs font-bold">
-                              <input
-                                type="checkbox"
-                                checked={line.sambal}
-                                onChange={(event) =>
-                                  updateCartLine(line.product.id, { sambal: event.target.checked })
-                                }
-                                className="h-4 w-4 accent-[#ef2b1e]"
-                              />
-                              🌶️ {tr.wantSambal}
-                            </label>
+                            {showSambalOption && (
+                              <label className="flex cursor-pointer items-center gap-2 text-xs font-bold">
+                                <input
+                                  type="checkbox"
+                                  checked={line.sambal}
+                                  onChange={(event) =>
+                                    updateCartLine(line.product.id, { sambal: event.target.checked })
+                                  }
+                                  className="h-4 w-4 accent-[#ef2b1e]"
+                                />
+                                🌶️ {tr.wantSambal}
+                              </label>
+                            )}
                             {showPilavOption && (
                               <label className="flex cursor-pointer items-center gap-2 text-xs font-bold">
                                 <input

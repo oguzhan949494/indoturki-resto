@@ -120,6 +120,13 @@ export function categoryAllowsExtraNoodle(categoryNameTr: string) {
   return categoryNameTr.toLowerCase().includes("noodle");
 }
 
+// İçecek kategorileri (Coffee & Tea, Mixed Drinks, Soft Drinks) için
+// sambal sos seçeneği anlamsız, bu kategorilerde gösterilmiyor.
+export function categoryIsBeverage(categoryNameTr: string) {
+  const n = categoryNameTr.toLowerCase();
+  return n.includes("coffee") || n.includes("tea") || n.includes("drink");
+}
+
 // Bir sepet satırının, seçilen eklentilerle birlikte birim fiyatı.
 export function lineUnitPrice(line: CartLine): number {
   let price = line.product.price;
