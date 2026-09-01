@@ -215,6 +215,24 @@ export default function ProductImagesPage() {
     }
   };
 
+  const barkodGuncelle = async (product: Product, deger: string) => {
+    const yeniBarkod = deger.trim() || null;
+
+    setProducts((current) =>
+      current.map((p) => (p.id === product.id ? { ...p, barcode: yeniBarkod } : p))
+    );
+
+    const { error } = await supabase
+      .from("products")
+      .update({ barcode: yeniBarkod })
+      .eq("id", product.id);
+
+    if (error) {
+      console.error("Barkod güncellenemedi:", error);
+      setErrorId(product.id);
+    }
+  };
+
   const stokMiktariGuncelle = async (product: Product, deger: string) => {
     const sayi = deger.trim() === "" ? null : Math.max(0, parseInt(deger, 10) || 0);
 
@@ -477,6 +495,31 @@ export default function ProductImagesPage() {
                             placeholder="Sınırsız"
                             className="mt-1 w-full rounded-lg border border-[#e5d4c2] px-2 py-1.5 text-xs outline-none focus:border-[#ef2b1e]"
                           />
+                        </div>
+                      )}
+
+                      {product.section === "menu" && (
+                        <div className="mt-2">
+                          <label className="text-[10px] font-bold uppercase tracking-wide text-[#a18b7b]">
+                            İkas Barkodu (eşleştirme için)
+                          </label>
+                          <input
+                            defaultValue={product.barcode ?? ""}
+                            onBlur={(e) => barkodGuncelle(product, e.target.value)}
+                            placeholder="Barkod gir..."
+                            className="mt-1 w-full rounded-lg border border-[#e5d4c2] px-2 py-1.5 text-xs outline-none focus:border-[#ef2b1e]"
+                          />
+                          {product.barcode && (
+                            <p
+                              className={`mt-1 text-[10px] font-bold ${
+                                product.ikasVariantId ? "text-green-700" : "text-amber-700"
+                              }`}
+                            >
+                              {product.ikasVariantId
+                                ? "✅ İkas'a bağlı"
+                                : "⏳ Bağlanmadı — bir sonraki senkronizasyonda denenecek"}
+                            </p>
+                          )}
                         </div>
                       )}
 

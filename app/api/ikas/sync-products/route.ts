@@ -123,11 +123,50 @@ async function runSync() {
       }
     }
 
+    // ---------- 2.5) Restoran menüsü ürünleriyle barkod eşleştirmesi ----------
+    // Admin, "Ürün Yönetimi"nde bir restoran ürününe (yemek) barkod
+    // girdiyse ve o barkod ikas'ta da varsa, o yemeği YENİ bir market
+    // ürünü olarak eklemek yerine mevcut menü ürününe BAĞLIYORUZ (sadece
+    // ikas_variant_id alanını dolduruyoruz — fiyat/ad/görsel değişmiyor).
+    const ikasSkus = allIkasProducts
+      .map((p) => p.variants?.[0]?.sku)
+      .filter((sku): sku is string => !!sku);
+
+    const menuBarcodeToProductId = new Map<string, string>();
+    if (ikasSkus.length > 0) {
+      const { data: menuMatches } = await supabase
+        .from("products")
+        .select("id, barcode")
+        .eq("section", "menu")
+        .in("barcode", ikasSkus);
+
+      for (const m of menuMatches ?? []) {
+        if (m.barcode) menuBarcodeToProductId.set(m.barcode, m.id);
+      }
+
+      for (const product of allIkasProducts) {
+        const variant = product.variants?.[0];
+        const sku = variant?.sku;
+        if (!sku || !variant) continue;
+        const menuProductId = menuBarcodeToProductId.get(sku);
+        if (menuProductId) {
+          await supabase
+            .from("products")
+            .update({ ikas_product_id: product.id, ikas_variant_id: variant.id })
+            .eq("id", menuProductId);
+        }
+      }
+    }
+
     // ---------- 3) Ürünleri TEK seferde toplu kaydet (upsert) ----------
     const productPayloads = allIkasProducts
       .map((product) => {
         const variant = product.variants?.[0];
         if (!variant) return null;
+
+        // Bu ürün bir restoran menü ürününe bağlandıysa, ayrıca market
+        // ürünü olarak da eklemeye gerek yok (çift listeleme olmasın).
+        if (variant.sku && menuBarcodeToProductId.has(variant.sku)) return null;
 
         const categoryName = product.categories?.[0]?.name || "Market Ürünleri";
         const categoryId = categoryNameToId.get(categoryName);
@@ -152,6 +191,7 @@ async function runSync() {
           description_id: product.description || "",
           price_tl: price,
           image_url: imageUrl,
+          barcode: variant.sku || null,
           section: "market",
           source: "ikas",
           ikas_product_id: product.id,

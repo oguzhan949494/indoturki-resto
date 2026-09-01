@@ -22,6 +22,8 @@ export type DbProduct = {
   image_url: string | null;
   section: string | null;
   stock_quantity: number | null;
+  barcode: string | null;
+  ikas_variant_id: string | null;
 };
 
 export type Category = {
@@ -48,6 +50,8 @@ export type Product = {
   section: "menu" | "market";
   stockQuantity: number | null;
   sortOrder: number;
+  barcode: string | null;
+  ikasVariantId: string | null;
 };
 
 export type NoodleType = "noodle150" | "mix" | "bihun150";
@@ -92,6 +96,8 @@ export function mapProducts(rows: DbProduct[] | null): Product[] {
     section: row.section === "market" ? "market" : "menu",
     stockQuantity: row.stock_quantity ?? null,
     sortOrder: row.sort_order,
+    barcode: row.barcode ?? null,
+    ikasVariantId: row.ikas_variant_id ?? null,
   }));
 }
 

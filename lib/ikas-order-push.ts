@@ -139,12 +139,16 @@ export async function pushOrderToIkas(orderId: string): Promise<void> {
   }
 
   let foodTotal = 0;
-  const marketLines: { variantId: string; quantity: number; price: number }[] = [];
+  const linkedLines: { variantId: string; quantity: number; price: number }[] = [];
 
   for (const item of (order as any).order_items ?? []) {
     const product = item.products;
-    if (product?.source === "ikas" && product.ikas_variant_id) {
-      marketLines.push({
+    // Market ürünleri zaten ikas'tan geliyor; restoran menüsü ürünleri de
+    // artık barkod eşleştirmesiyle ikas_variant_id kazanabiliyor — ikisi
+    // de aynı şekilde, kendi gerçek satırında gönderiliyor. Eşleşmemiş
+    // yemekler (ikas_variant_id yok) hâlâ toplu "Restoran Ürünü" altına.
+    if (product?.ikas_variant_id) {
+      linkedLines.push({
         variantId: product.ikas_variant_id,
         quantity: item.quantity,
         price: Number(item.unit_price_tl),
@@ -166,7 +170,7 @@ export async function pushOrderToIkas(orderId: string): Promise<void> {
     const courierVariantId = await getPlaceholderVariantId(supabase, "courier");
     orderLineItems.push({ variant: { id: courierVariantId }, price: courierFee, quantity: 1 });
   }
-  for (const line of marketLines) {
+  for (const line of linkedLines) {
     orderLineItems.push({
       variant: { id: line.variantId },
       price: line.price,
