@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useCallback } from "react";
+import Link from "next/link";
 import { createClient } from "@/utils/supabase/client";
 
 const supabase = createClient();
@@ -163,8 +164,25 @@ export default function SiparisPanelPage() {
           }
         `}</style>
 
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
-          <h1 style={{ fontSize: "1.3rem", margin: 0 }}>📋 Yeni Siparişler ({siparisler.length})</h1>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20, gap: 12, flexWrap: "wrap" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <Link
+              href="/admin"
+              style={{
+                padding: "10px 16px",
+                borderRadius: 8,
+                border: "1px solid #2a2d36",
+                background: "#1a1d24",
+                color: "#f2f2f2",
+                fontWeight: 600,
+                textDecoration: "none",
+                fontSize: "0.9rem",
+              }}
+            >
+              ← Yönetici Paneline Dön
+            </Link>
+            <h1 style={{ fontSize: "1.3rem", margin: 0 }}>📋 Yeni Siparişler ({siparisler.length})</h1>
+          </div>
           <button
             onClick={tumunuYazdirVeIsaretle}
             disabled={siparisler.length === 0}
