@@ -111,17 +111,35 @@ export default function RestoPosPage() {
     }
   }, [menuModalAcik, tablesModalAcik, manuelModalAcik, odemeModalAcik]);
 
+  // Barkod okuyucu ile sistemdeki kayıt arasında baştaki rakam sayısı
+  // tutmayabiliyor (fazladan eklenmiş ya da eksik olabiliyor) — bu yüzden
+  // hem baştan bir rakam ekleyerek hem de baştan bir rakam çıkararak
+  // olası tüm varyasyonları aynı anda deniyoruz.
+  const adayBarkodlariUret = (okunanKod: string) => {
+    const adaylar = [okunanKod];
+    for (let rakam = 0; rakam <= 9; rakam++) {
+      adaylar.push(String(rakam) + okunanKod);
+    }
+    if (okunanKod.length > 1) {
+      adaylar.push(okunanKod.slice(1));
+    }
+    return adaylar;
+  };
+
   const barkodIsle = useCallback(
     async (kod: string) => {
       const temiz = kod.trim();
       if (!temiz) return;
 
-      const { data } = await supabase
+      const adaylar = adayBarkodlariUret(temiz);
+
+      const { data: eslesmeler } = await supabase
         .from("products")
         .select("id, name_tr, price_tl, section")
-        .eq("barcode", temiz)
-        .limit(1)
-        .maybeSingle();
+        .in("barcode", adaylar)
+        .limit(1);
+
+      const data = eslesmeler?.[0] ?? null;
 
       if (!data) {
         if (fiyatGorModu) {
