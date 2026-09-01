@@ -111,6 +111,31 @@ export default function RestoPosPage() {
     }
   }, [menuModalAcik, tablesModalAcik, manuelModalAcik, odemeModalAcik, fiyatGorModu, fiyatGorSonuc]);
 
+  // İmleç (odak) bir yazı kutusunun DIŞINDayken (örn. bir butonun
+  // üzerindeyken ya da hiçbir yerdeyken) okuyucuyla barkod okutulursa,
+  // gelen tuş vuruşlarını yakalayıp odağı barkod kutusuna geri getiriyoruz.
+  // Bu ilk okutma kaybolabilir (odak henüz doğru yerde değildi), ama
+  // hemen ardından odak barkod kutusunda olacağı için ikinci okutma
+  // normal şekilde çalışır. Yazı kutularına (arama, indirim, fiyat vb.)
+  // ODAKLIYKEN bu devreye girmiyor — onları hiç etkilemiyor.
+  useEffect(() => {
+    const handler = () => {
+      const aktifEtiket = (document.activeElement?.tagName || "").toLowerCase();
+      const yaziKutusundaMi = ["input", "textarea", "select"].includes(aktifEtiket);
+      if (
+        !yaziKutusundaMi &&
+        !menuModalAcik &&
+        !tablesModalAcik &&
+        !manuelModalAcik &&
+        !odemeModalAcik
+      ) {
+        barkodRef.current?.focus();
+      }
+    };
+    document.addEventListener("keydown", handler);
+    return () => document.removeEventListener("keydown", handler);
+  }, [menuModalAcik, tablesModalAcik, manuelModalAcik, odemeModalAcik]);
+
   // Barkod okuyucu ile sistemdeki kayıt arasında baştaki rakam sayısı
   // tutmayabiliyor (fazladan eklenmiş ya da eksik olabiliyor) — bu yüzden
   // hem baştan bir rakam ekleyerek hem de baştan bir rakam çıkararak
