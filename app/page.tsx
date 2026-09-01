@@ -221,6 +221,10 @@ export default function Home() {
       lang === "tr"
         ? "Telefon numarası (Endonezya numarası da olabilir)"
         : "Nomor telepon (nomor Indonesia juga bisa)",
+    phoneHint:
+      lang === "tr"
+        ? "Daha önce sipariş verdiyseniz bilgileriniz otomatik doldurulur."
+        : "Jika Anda pernah memesan sebelumnya, informasi Anda akan terisi otomatis.",
     addressNotePlaceholder:
       lang === "tr"
         ? "Daire no, işletme adı (otel/spa vb.) gibi detayları buraya yazabilirsiniz..."
@@ -1230,18 +1234,21 @@ export default function Home() {
                   <div className="grid gap-3 sm:grid-cols-2">
                     <input
                       required
-                      value={customerName}
-                      onChange={(event) => setCustomerName(event.target.value)}
-                      placeholder={tr.name}
-                      className="rounded-2xl border border-[#e5d4c2] bg-white px-4 py-3 outline-none focus:border-[#ef2b1e]"
-                    />
-                    <input
-                      required
                       type="tel"
                       value={customerPhone}
                       onChange={(event) => setCustomerPhone(event.target.value)}
                       onBlur={lookupReturningCustomer}
                       placeholder={tr.phone}
+                      className="sm:col-span-2 rounded-2xl border border-[#e5d4c2] bg-white px-4 py-3 outline-none focus:border-[#ef2b1e]"
+                    />
+                    <p className="-mt-1.5 text-[11px] font-bold text-[#a18b7b] sm:col-span-2">
+                      {tr.phoneHint}
+                    </p>
+                    <input
+                      required
+                      value={customerName}
+                      onChange={(event) => setCustomerName(event.target.value)}
+                      placeholder={tr.name}
                       className="sm:col-span-2 rounded-2xl border border-[#e5d4c2] bg-white px-4 py-3 outline-none focus:border-[#ef2b1e]"
                     />
                     {orderType === "delivery" && (
