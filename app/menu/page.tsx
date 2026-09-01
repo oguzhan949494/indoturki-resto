@@ -64,6 +64,7 @@ function TableMenu() {
   const [tableError, setTableError] = useState(false);
 
   const [activeCategory, setActiveCategory] = useState<string>(ALL_CATEGORY_ID);
+  const [menuSection, setMenuSection] = useState<"menu" | "market">("menu");
   const [search, setSearch] = useState("");
   const [cart, setCart] = useState<CartLine[]>([]);
   const [checkoutOpen, setCheckoutOpen] = useState(false);
@@ -135,14 +136,12 @@ function TableMenu() {
         .from("categories")
         .select("id, name_tr, name_id, emoji, sort_order, section")
         .eq("is_active", true)
-        .eq("section", "menu")
         .order("sort_order", { ascending: true });
 
       const { data: productData } = await supabase
         .from("products")
         .select("*")
         .eq("is_available", true)
-        .eq("section", "menu")
         .order("sort_order", { ascending: true });
 
       setCategories(mapCategories(categoryData));
@@ -251,11 +250,12 @@ function TableMenu() {
     const categorySortMap = new Map(categories.map((c) => [c.id, c.sortOrder]));
     return products
       .filter((product) => {
+        const sectionMatch = product.section === menuSection;
         const categoryMatch =
           activeCategory === ALL_CATEGORY_ID || product.categoryId === activeCategory;
         const name = productName(product).toLocaleLowerCase("tr-TR");
         const searchMatch = !q || name.includes(q);
-        return categoryMatch && searchMatch;
+        return sectionMatch && categoryMatch && searchMatch;
       })
       .sort((a, b) => {
         const catA = categorySortMap.get(a.categoryId) ?? 0;
@@ -264,7 +264,12 @@ function TableMenu() {
         return a.sortOrder - b.sortOrder;
       });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeCategory, search, products, lang, categories]);
+  }, [activeCategory, search, products, lang, categories, menuSection]);
+
+  const visibleCategories = useMemo(
+    () => categories.filter((category) => category.section === menuSection),
+    [categories, menuSection]
+  );
 
   // Stok takibi olan ürünlerde (menü ya da market fark etmez), stoktan
   // fazlası sepete eklenemez. Stok takibi yoksa (stockQuantity boş) sınırsız.
@@ -668,6 +673,37 @@ function TableMenu() {
         </div>
 
         <div className="mx-auto max-w-6xl px-4 pb-3 sm:px-6">
+          <div className="flex gap-2">
+            <button
+              onClick={() => {
+                setMenuSection("menu");
+                setActiveCategory(ALL_CATEGORY_ID);
+              }}
+              className={`flex-1 rounded-2xl px-4 py-2.5 text-sm font-black transition ${
+                menuSection === "menu"
+                  ? "bg-[#231710] text-white shadow-sm"
+                  : "border border-[#e5d6c7] bg-white text-[#5b4032]"
+              }`}
+            >
+              🍽️ {lang === "tr" ? "Menü" : "Menu"}
+            </button>
+            <button
+              onClick={() => {
+                setMenuSection("market");
+                setActiveCategory(ALL_CATEGORY_ID);
+              }}
+              className={`flex-1 rounded-2xl px-4 py-2.5 text-sm font-black transition ${
+                menuSection === "market"
+                  ? "bg-[#231710] text-white shadow-sm"
+                  : "border border-[#e5d6c7] bg-white text-[#5b4032]"
+              }`}
+            >
+              🛒 {lang === "tr" ? "Market" : "Pasar"}
+            </button>
+          </div>
+        </div>
+
+        <div className="mx-auto max-w-6xl px-4 pb-3 sm:px-6">
           <div className="relative">
             <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400">⌕</span>
             <input
@@ -691,7 +727,7 @@ function TableMenu() {
             >
               ✨ {lang === "tr" ? "Tümü" : "Semua"}
             </button>
-            {categories.map((category) => (
+            {visibleCategories.map((category) => (
               <button
                 key={category.id}
                 onClick={() => setActiveCategory(category.id)}

@@ -22,6 +22,8 @@ function FiyatSorInner() {
   const scannerRef = useRef(null);
   const [sonuc, setSonuc] = useState(null); // { ad, fiyat } | "hata" | "bekleniyor" | null
   const [manuelBarkod, setManuelBarkod] = useState("");
+  const [sepetUrun, setSepetUrun] = useState(null); // { id, ad, fiyat } | null
+  const [sepeteEklendi, setSepeteEklendi] = useState(false);
   const lastCodeRef = useRef({ code: "", time: 0 });
 
   useEffect(() => {
@@ -93,6 +95,8 @@ function FiyatSorInner() {
   async function fiyatSorgula(barkod) {
     if (!barkod) return;
     setSonuc("bekleniyor");
+    setSepetUrun(null);
+    setSepeteEklendi(false);
 
     const adaylar = adayBarkodlariUret(barkod.trim());
 
@@ -108,6 +112,86 @@ function FiyatSorInner() {
     }
 
     setSonuc({ ad: data[0][AD_KOLON], fiyat: data[0][FIYAT_KOLON] });
+
+    // Masadan sepete ekleyebilmek için, aynı barkodla eşleşen bizim
+    // market ürünümüzü (ikas'tan senkronize edilen) de ara.
+    if (masaNo) {
+      const { data: urunData } = await supabase
+        .from("products")
+        .select("id, name_tr, price_tl")
+        .eq("section", "market")
+        .in("barcode", adaylar)
+        .limit(1)
+        .maybeSingle();
+
+      if (urunData) {
+        setSepetUrun({ id: urunData.id, ad: urunData.name_tr, fiyat: urunData.price_tl });
+      }
+    }
+  }
+
+  // Barkodla bulunan ürünü, doğrudan masanın açık oturumuna ekler
+  // (kendi mini siparişi olarak — kasiyer "Masa Takip"te görür).
+  async function sepeteEkle() {
+    if (!sepetUrun || !masaNo) return;
+
+    const { data: tableRow } = await supabase
+      .from("restaurant_tables")
+      .select("id")
+      .eq("table_number", Number(masaNo))
+      .maybeSingle();
+    if (!tableRow) return;
+
+    let sessionId;
+    const { data: existingSession } = await supabase
+      .from("table_sessions")
+      .select("id")
+      .eq("table_id", tableRow.id)
+      .eq("status", "open")
+      .order("opened_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (existingSession?.id) {
+      sessionId = existingSession.id;
+    } else {
+      const { data: newSession } = await supabase
+        .from("table_sessions")
+        .insert({ table_id: tableRow.id, status: "open" })
+        .select("id")
+        .single();
+      sessionId = newSession?.id;
+    }
+    if (!sessionId) return;
+
+    const { data: orderData } = await supabase
+      .from("orders")
+      .insert({
+        source: "table",
+        table_id: tableRow.id,
+        table_session_id: sessionId,
+        customer_name: "Barkod ile eklendi",
+        total_tl: sepetUrun.fiyat,
+        total_idr: 0,
+        payment_status: "pending",
+        order_status: "new",
+      })
+      .select("id")
+      .single();
+    if (!orderData) return;
+
+    await supabase.from("order_items").insert({
+      order_id: orderData.id,
+      product_id: sepetUrun.id,
+      product_name_tr: sepetUrun.ad,
+      quantity: 1,
+      unit_price_tl: sepetUrun.fiyat,
+      unit_price_idr: 0,
+      options: [],
+      item_note: null,
+    });
+
+    setSepeteEklendi(true);
   }
 
   return (
@@ -229,6 +313,31 @@ function FiyatSorInner() {
               })}{" "}
               ₺
             </div>
+
+            {sepetUrun && !sepeteEklendi && (
+              <button
+                onClick={sepeteEkle}
+                style={{
+                  marginTop: 14,
+                  width: "100%",
+                  padding: 14,
+                  borderRadius: 12,
+                  border: "none",
+                  background: "#22c55e",
+                  color: "#fff",
+                  fontWeight: 700,
+                  fontSize: "1rem",
+                }}
+              >
+                🛒 Sepete Ekle
+              </button>
+            )}
+
+            {sepeteEklendi && (
+              <div style={{ marginTop: 14, color: "#22c55e", fontWeight: 700 }}>
+                ✅ Sepete eklendi — Masa {masaNo} hesabına yansıdı
+              </div>
+            )}
           </>
         )}
       </div>
