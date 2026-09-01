@@ -34,6 +34,7 @@ const LIST_PRODUCT_QUERY = `
         variants {
           id
           sku
+          barcodeList
           images {
             imageId
             isMain
@@ -145,12 +146,19 @@ async function runSync() {
       if (m.barcode) menuBarcodeToProductId.set(m.barcode, m.id);
     }
 
+    // Bir varyantın gerçek (taranabilir) barkodunu döner — ikas'ta ayrı
+    // bir "barcodeList" alanı var, o doluysa onu kullanıyoruz; boşsa
+    // (bazı ürünlerde SKU ile barkod aynı olabildiği için) SKU'ya
+    // düşüyoruz.
+    const gercekBarkod = (variant: any): string | null =>
+      variant?.barcodeList?.[0] || variant?.sku || null;
+
     if (menuBarcodeToProductId.size > 0) {
       for (const product of allIkasProducts) {
         const variant = product.variants?.[0];
-        const sku = variant?.sku;
-        if (!sku || !variant) continue;
-        const menuProductId = menuBarcodeToProductId.get(sku);
+        const barkod = gercekBarkod(variant);
+        if (!barkod || !variant) continue;
+        const menuProductId = menuBarcodeToProductId.get(barkod);
         if (menuProductId) {
           await supabase
             .from("products")
@@ -166,9 +174,11 @@ async function runSync() {
         const variant = product.variants?.[0];
         if (!variant) return null;
 
+        const barkod = gercekBarkod(variant);
+
         // Bu ürün bir restoran menü ürününe bağlandıysa, ayrıca market
         // ürünü olarak da eklemeye gerek yok (çift listeleme olmasın).
-        if (variant.sku && menuBarcodeToProductId.has(variant.sku)) return null;
+        if (barkod && menuBarcodeToProductId.has(barkod)) return null;
 
         const categoryName = product.categories?.[0]?.name || "Market Ürünleri";
         const categoryId = categoryNameToId.get(categoryName);
@@ -193,7 +203,7 @@ async function runSync() {
           description_id: product.description || "",
           price_tl: price,
           image_url: imageUrl,
-          barcode: variant.sku || null,
+          barcode: barkod,
           section: "market",
           source: "ikas",
           ikas_product_id: product.id,
