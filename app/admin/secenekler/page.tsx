@@ -10,6 +10,7 @@ type Choice = {
   name_tr: string;
   name_id: string;
   price_delta: number;
+  price_delta_percent: number | null;
   is_default: boolean;
   sort_order: number;
 };
@@ -198,44 +199,71 @@ export default function SeceneklerPage() {
                   {(choicesByGroup[group.id] ?? []).map((choice) => (
                     <div
                       key={choice.id}
-                      className="grid grid-cols-[1fr_1fr_90px_auto_auto] items-center gap-2 rounded-xl border border-[#eee7db] p-2"
+                      className="space-y-1.5 rounded-xl border border-[#eee7db] p-2"
                     >
-                      <input
-                        defaultValue={choice.name_tr}
-                        onBlur={(e) => secenekGuncelle(choice, { name_tr: e.target.value })}
-                        placeholder="Ad (TR)"
-                        className="rounded-lg border border-[#e5d4c2] px-2 py-1.5 text-xs font-bold"
-                      />
-                      <input
-                        defaultValue={choice.name_id}
-                        onBlur={(e) => secenekGuncelle(choice, { name_id: e.target.value })}
-                        placeholder="Ad (ID)"
-                        className="rounded-lg border border-[#e5d4c2] px-2 py-1.5 text-xs font-bold"
-                      />
-                      <input
-                        type="number"
-                        defaultValue={choice.price_delta}
-                        onBlur={(e) =>
-                          secenekGuncelle(choice, { price_delta: Number(e.target.value) || 0 })
-                        }
-                        placeholder="Fiyat farkı"
-                        className="rounded-lg border border-[#e5d4c2] px-2 py-1.5 text-xs font-bold"
-                      />
-                      <label className="flex items-center gap-1 text-[10px] font-bold text-[#7a6f63]">
+                      <div className="grid grid-cols-2 gap-2">
                         <input
-                          type="checkbox"
-                          checked={choice.is_default}
-                          onChange={(e) => secenekGuncelle(choice, { is_default: e.target.checked })}
-                          className="h-3.5 w-3.5"
+                          defaultValue={choice.name_tr}
+                          onBlur={(e) => secenekGuncelle(choice, { name_tr: e.target.value })}
+                          placeholder="Ad (TR)"
+                          className="rounded-lg border border-[#e5d4c2] px-2 py-1.5 text-xs font-bold"
                         />
-                        Varsayılan
-                      </label>
-                      <button
-                        onClick={() => secenekSil(choice)}
-                        className="rounded-full border border-red-300 px-2 py-1 text-[10px] font-bold text-red-600"
-                      >
-                        Sil
-                      </button>
+                        <input
+                          defaultValue={choice.name_id}
+                          onBlur={(e) => secenekGuncelle(choice, { name_id: e.target.value })}
+                          placeholder="Ad (ID)"
+                          className="rounded-lg border border-[#e5d4c2] px-2 py-1.5 text-xs font-bold"
+                        />
+                      </div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <div className="flex items-center gap-1">
+                          <input
+                            type="number"
+                            defaultValue={choice.price_delta}
+                            onBlur={(e) =>
+                              secenekGuncelle(choice, { price_delta: Number(e.target.value) || 0 })
+                            }
+                            placeholder="Sabit fark"
+                            className="w-24 rounded-lg border border-[#e5d4c2] px-2 py-1.5 text-xs font-bold"
+                          />
+                          <span className="text-[10px] font-bold text-[#a18b7b]">₺</span>
+                        </div>
+                        <span className="text-[10px] font-bold text-[#a18b7b]">veya</span>
+                        <div className="flex items-center gap-1">
+                          <input
+                            type="number"
+                            defaultValue={choice.price_delta_percent ?? ""}
+                            onBlur={(e) =>
+                              secenekGuncelle(choice, {
+                                price_delta_percent:
+                                  e.target.value.trim() === "" ? null : Number(e.target.value),
+                              })
+                            }
+                            placeholder="Yüzde"
+                            className="w-20 rounded-lg border border-[#e5d4c2] px-2 py-1.5 text-xs font-bold"
+                          />
+                          <span className="text-[10px] font-bold text-[#a18b7b]">
+                            % (ürün fiyatına göre)
+                          </span>
+                        </div>
+                        <label className="ml-auto flex items-center gap-1 text-[10px] font-bold text-[#7a6f63]">
+                          <input
+                            type="checkbox"
+                            checked={choice.is_default}
+                            onChange={(e) =>
+                              secenekGuncelle(choice, { is_default: e.target.checked })
+                            }
+                            className="h-3.5 w-3.5"
+                          />
+                          Varsayılan
+                        </label>
+                        <button
+                          onClick={() => secenekSil(choice)}
+                          className="rounded-full border border-red-300 px-2 py-1 text-[10px] font-bold text-red-600"
+                        >
+                          Sil
+                        </button>
+                      </div>
                     </div>
                   ))}
                   <button

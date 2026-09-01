@@ -9,6 +9,7 @@ import {
   loadCategoryOptionGroups,
   defaultSelectionFor,
   buildDynamicOptionLines,
+  computeChoiceDelta,
   type OptionGroup,
 } from "@/utils/option-groups";
 import Link from "next/link";
@@ -387,7 +388,8 @@ function TableMenu() {
         dynamic_options: buildDynamicOptionLines(
           categoryOptionGroups[line.product.categoryId] ?? [],
           line.dynamicSelections ?? {},
-          lang
+          lang,
+          line.product.price
         ),
       }));
 
@@ -1071,8 +1073,13 @@ function TableMenu() {
                                           className="h-4 w-4 accent-[#ef2b1e]"
                                         />
                                         {name}
-                                        {choice.priceDelta !== 0 &&
-                                          ` (${choice.priceDelta > 0 ? "+" : ""}${choice.priceDelta}₺)`}
+                                        {(() => {
+                                          const delta = computeChoiceDelta(
+                                            choice,
+                                            line.product.price
+                                          );
+                                          return delta !== 0 ? ` (${delta > 0 ? "+" : ""}${delta}₺)` : null;
+                                        })()}
                                       </label>
                                     );
                                   })}

@@ -140,9 +140,13 @@ export function categoryAllowsNoodleTypeChoice(categoryNameTr: string) {
 // Bir sepet satırının, seçilen eklentilerle birlikte birim fiyatı.
 export function lineUnitPrice(
   line: CartLine,
-  categoryOptionGroups?: Record<string, { id: string; choices: { id: string; priceDelta: number }[] }[]>
+  categoryOptionGroups?: Record<
+    string,
+    { id: string; choices: { id: string; priceDelta: number; priceDeltaPercent: number | null }[] }[]
+  >
 ): number {
-  let price = line.product.price;
+  const basePrice = line.product.price;
+  let price = basePrice;
   if (line.extraPilav) price += EXTRA_ADDON_PRICE;
   if (line.extraNoodle) price += EXTRA_ADDON_PRICE;
 
@@ -152,7 +156,11 @@ export function lineUnitPrice(
       const selected = line.dynamicSelections?.[group.id] ?? [];
       for (const choiceId of selected) {
         const choice = group.choices.find((c) => c.id === choiceId);
-        if (choice) price += choice.priceDelta;
+        if (!choice) continue;
+        price +=
+          choice.priceDeltaPercent != null
+            ? Math.round(basePrice * (choice.priceDeltaPercent / 100))
+            : choice.priceDelta;
       }
     }
   }
