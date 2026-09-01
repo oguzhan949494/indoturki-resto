@@ -395,6 +395,12 @@ export default function AdminPage() {
               🍽️ Masa Takip
             </Link>
             <Link
+              href="/siparis-panel"
+              className="rounded-full border border-[#e2ddd3] px-4 py-2 text-xs font-bold text-[#5b4032]"
+            >
+              🖨️ Sipariş & Fiş Paneli
+            </Link>
+            <Link
               href="/admin/products"
               className="rounded-full border border-[#e2ddd3] px-4 py-2 text-xs font-bold text-[#5b4032]"
             >
