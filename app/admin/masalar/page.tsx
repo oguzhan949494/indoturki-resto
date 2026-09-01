@@ -49,6 +49,8 @@ export default function MasaTakipPage() {
   const [items, setItems] = useState<OrderItemDetail[]>([]);
   const [loading, setLoading] = useState(true);
   const [bolMod, setBolMod] = useState(false);
+  const [yazdiriliyor, setYazdiriliyor] = useState(false);
+  const [urunAramaMetni, setUrunAramaMetni] = useState("");
 
   const [urunEkleAcik, setUrunEkleAcik] = useState(false);
   const [categories, setCategories] = useState<CategoryOption[]>([]);
@@ -167,6 +169,14 @@ export default function MasaTakipPage() {
     }
   };
 
+  const mutfagaYazdir = () => {
+    setYazdiriliyor(true);
+    setTimeout(() => {
+      window.print();
+      setYazdiriliyor(false);
+    }, 150);
+  };
+
   const masayiSifirla = async (tableId: string) => {
     const sessionId = openSessionByTable[tableId];
     if (!sessionId) return;
@@ -207,6 +217,7 @@ export default function MasaTakipPage() {
       }
     }
     setEklenecekSepet({});
+    setUrunAramaMetni("");
     setUrunEkleAcik(true);
   };
 
@@ -286,14 +297,19 @@ export default function MasaTakipPage() {
   };
 
   const seciliMasa = tables.find((t) => t.id === selectedTableId);
-  const kategoriUrunleri = products.filter((p) => p.category_id === aktifKategori);
+  const kategoriUrunleri = urunAramaMetni.trim()
+    ? products.filter((p) =>
+        p.name_tr.toLocaleLowerCase("tr-TR").includes(urunAramaMetni.trim().toLocaleLowerCase("tr-TR"))
+      )
+    : products.filter((p) => p.category_id === aktifKategori);
   const eklenecekToplam = Object.entries(eklenecekSepet).reduce((sum, [productId, adet]) => {
     const urun = products.find((p) => p.id === productId);
     return sum + (urun ? Number(urun.price_tl) * adet : 0);
   }, 0);
 
   return (
-    <main className="min-h-screen bg-[#f3f1ed] text-[#231710]">
+    <>
+    <main className="ekran-icerigi min-h-screen bg-[#f3f1ed] text-[#231710]">
       <header className="sticky top-0 z-20 border-b border-[#e2ddd3] bg-white px-4 py-4 sm:px-8">
         <div className="mx-auto flex max-w-6xl items-center justify-between">
           <div>
@@ -366,6 +382,14 @@ export default function MasaTakipPage() {
                       >
                         + Ürün Ekle
                       </button>
+                      {items.length > 0 && (
+                        <button
+                          onClick={mutfagaYazdir}
+                          className="rounded-full border border-[#231710] px-4 py-2 text-xs font-bold text-[#231710]"
+                        >
+                          🖨️ Mutfağa Yazdır
+                        </button>
+                      )}
                       {items.length > 0 && (
                         <button
                           onClick={() => setBolMod((v) => !v)}
@@ -542,13 +566,23 @@ export default function MasaTakipPage() {
               </button>
             </div>
 
-            <div className="mb-3 flex gap-2 overflow-x-auto pb-2">
+            <input
+              value={urunAramaMetni}
+              onChange={(e) => setUrunAramaMetni(e.target.value)}
+              placeholder="Ürün ara..."
+              className="mb-3 w-full rounded-2xl border border-[#e5d4c2] px-4 py-2.5 text-sm outline-none focus:border-[#ef2b1e]"
+            />
+
+            <div className={`mb-3 flex gap-2 overflow-x-auto pb-2 ${urunAramaMetni.trim() ? "opacity-40" : ""}`}>
               {categories.map((c) => (
                 <button
                   key={c.id}
-                  onClick={() => setAktifKategori(c.id)}
+                  onClick={() => {
+                    setUrunAramaMetni("");
+                    setAktifKategori(c.id);
+                  }}
                   className={`shrink-0 rounded-full px-3 py-1.5 text-xs font-bold ${
-                    aktifKategori === c.id
+                    aktifKategori === c.id && !urunAramaMetni.trim()
                       ? "bg-[#ef2b1e] text-white"
                       : "border border-[#e5d4c2] text-[#5b4032]"
                   }`}
@@ -600,5 +634,55 @@ export default function MasaTakipPage() {
         </div>
       )}
     </main>
+
+    {/* Mutfağa yazdırma alanı — masadaki TÜM birikmiş sipariş tek fişte. */}
+    {yazdiriliyor && seciliMasa && (
+      <div id="masa-fisi-yazdirma" style={{ display: "none" }}>
+        <style>{`
+          @media print {
+            .ekran-icerigi { display: none !important; }
+            #masa-fisi-yazdirma { display: block !important; }
+            @page { size: 102mm 152mm; margin: 5mm; }
+          }
+        `}</style>
+        <div style={{ fontFamily: "Arial, sans-serif", color: "#000", fontSize: 12, lineHeight: 1.5 }}>
+          <div style={{ textAlign: "center", marginBottom: 8 }}>
+            <div style={{ fontWeight: 700, fontSize: 16 }}>INDOTURKI RESTO</div>
+            <div style={{ fontSize: 11 }}>MUTFAK FİŞİ — MASA {seciliMasa.table_number}</div>
+          </div>
+          <p style={{ margin: 0 }}>{new Date().toLocaleString("tr-TR")}</p>
+          <div style={{ borderTop: "1px dashed #000", borderBottom: "1px dashed #000", padding: "6px 0", marginTop: 8 }}>
+            {items.map((item) => (
+              <div key={item.id} style={{ marginBottom: 6 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", fontWeight: 700 }}>
+                  <span>
+                    {item.quantity}x {item.product_name_tr}
+                    {item.isTakeaway ? " (📦 Al-Götür)" : ""}
+                  </span>
+                </div>
+                {item.options && item.options.length > 0 && (
+                  <div style={{ fontSize: 11 }}>
+                    {item.options.map((code) => `• ${OPTION_LABELS[code]?.tr ?? code}`).join("  ")}
+                  </div>
+                )}
+                {item.dynamic_options && item.dynamic_options.length > 0 && (
+                  <div style={{ fontSize: 11 }}>
+                    {item.dynamic_options.map((o) => `• ${o.label}`).join("  ")}
+                  </div>
+                )}
+                {item.item_note && (
+                  <div style={{ fontSize: 11, fontStyle: "italic" }}>📝 {item.item_note}</div>
+                )}
+              </div>
+            ))}
+          </div>
+          <div style={{ display: "flex", justifyContent: "space-between", fontWeight: 700, marginTop: 6, fontSize: 13 }}>
+            <span>Toplam</span>
+            <span>{genelToplam.toLocaleString("tr-TR")} TL</span>
+          </div>
+        </div>
+      </div>
+    )}
+    </>
   );
 }

@@ -254,10 +254,27 @@ export default function AdminPage() {
     manual_status?: "auto" | "force_open" | "force_closed";
   }) => {
     setHoursSaving(true);
-    const { data: row } = await supabase.from("restaurant_settings").select("id").limit(1).maybeSingle();
-    if (row?.id) {
-      await supabase.from("restaurant_settings").update(patch).eq("id", row.id);
+    const { data: row, error: rowError } = await supabase
+      .from("restaurant_settings")
+      .select("id")
+      .limit(1)
+      .maybeSingle();
+
+    if (rowError || !row?.id) {
+      console.error("ÇALIŞMA SAATLERİ: ayar satırı bulunamadı", rowError);
+      setHoursSaving(false);
+      return;
     }
+
+    const { error: updateError } = await supabase
+      .from("restaurant_settings")
+      .update(patch)
+      .eq("id", row.id);
+
+    if (updateError) {
+      console.error("ÇALIŞMA SAATLERİ KAYDEDİLEMEDİ:", updateError);
+    }
+
     setHoursSaving(false);
   };
 
