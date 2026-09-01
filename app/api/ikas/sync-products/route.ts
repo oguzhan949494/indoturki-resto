@@ -42,6 +42,7 @@ const LIST_PRODUCT_QUERY = `
           }
           prices {
             sellPrice
+            discountPrice
           }
           stocks {
             stockCount
@@ -185,7 +186,11 @@ async function runSync() {
         if (!categoryId) return null;
 
         const priceEntry = Array.isArray(variant.prices) ? variant.prices[0] : variant.prices;
-        const price = Number(priceEntry?.sellPrice ?? 0);
+        const sellPrice = Number(priceEntry?.sellPrice ?? 0);
+        const discountPrice = Number(priceEntry?.discountPrice ?? 0);
+        // İndirimli fiyat tanımlıysa (0'dan büyük ve normal fiyattan
+        // düşükse) onu kullanıyoruz — yoksa normal satış fiyatını.
+        const price = discountPrice > 0 && discountPrice < sellPrice ? discountPrice : sellPrice;
         const stock = (variant.stocks ?? []).reduce(
           (sum: number, s: any) => sum + (Number(s.stockCount) || 0),
           0
