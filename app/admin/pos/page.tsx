@@ -101,22 +101,14 @@ export default function RestoPosPage() {
     localStorage.setItem("pos-otomatik-yazdir", deger ? "1" : "0");
   };
 
-  // Barkod okuyucu klavye gibi davranır — bu alanı hep odakta tutuyoruz.
+  // Barkod okuyucu klavye gibi davranır — bu alanı, hiçbir modal açık
+  // değilken (sayfa ilk açıldığında ya da bir modal kapatıldığında) odakta
+  // tutuyoruz. ÖNEMLİ: sayfadaki HER tıklamada değil — yoksa indirim
+  // menüsü gibi normal dropdown'lar/inputlar açılır açılmaz kapanırdı.
   useEffect(() => {
-    const odaklan = () => {
-      if (
-        !menuModalAcik &&
-        !tablesModalAcik &&
-        !manuelModalAcik &&
-        !odemeModalAcik &&
-        barkodRef.current
-      ) {
-        barkodRef.current.focus();
-      }
-    };
-    odaklan();
-    document.addEventListener("click", odaklan);
-    return () => document.removeEventListener("click", odaklan);
+    if (!menuModalAcik && !tablesModalAcik && !manuelModalAcik && !odemeModalAcik) {
+      barkodRef.current?.focus();
+    }
   }, [menuModalAcik, tablesModalAcik, manuelModalAcik, odemeModalAcik]);
 
   const barkodIsle = useCallback(

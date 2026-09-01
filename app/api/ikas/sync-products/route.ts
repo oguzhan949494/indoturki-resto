@@ -128,22 +128,24 @@ async function runSync() {
     // girdiyse ve o barkod ikas'ta da varsa, o yemeği YENİ bir market
     // ürünü olarak eklemek yerine mevcut menü ürününe BAĞLIYORUZ (sadece
     // ikas_variant_id alanını dolduruyoruz — fiyat/ad/görsel değişmiyor).
-    const ikasSkus = allIkasProducts
-      .map((p) => p.variants?.[0]?.sku)
-      .filter((sku): sku is string => !!sku);
+    //
+    // NOT: Önceki sürüm, ikas'taki TÜM ürünlerin barkodlarını (800+) tek
+    // seferde ".in()" ile sorguluyordu — bu, sorgu adresinin çok uzun
+    // olup reddedilmesine yol açıyordu. Bunun yerine SADECE barkodu
+    // GİRİLMİŞ (muhtemelen az sayıda) menü ürününü çekip, eşleştirmeyi
+    // bellek içinde yapıyoruz.
+    const { data: menuProductsWithBarcode } = await supabase
+      .from("products")
+      .select("id, barcode")
+      .eq("section", "menu")
+      .not("barcode", "is", null);
 
     const menuBarcodeToProductId = new Map<string, string>();
-    if (ikasSkus.length > 0) {
-      const { data: menuMatches } = await supabase
-        .from("products")
-        .select("id, barcode")
-        .eq("section", "menu")
-        .in("barcode", ikasSkus);
+    for (const m of menuProductsWithBarcode ?? []) {
+      if (m.barcode) menuBarcodeToProductId.set(m.barcode, m.id);
+    }
 
-      for (const m of menuMatches ?? []) {
-        if (m.barcode) menuBarcodeToProductId.set(m.barcode, m.id);
-      }
-
+    if (menuBarcodeToProductId.size > 0) {
       for (const product of allIkasProducts) {
         const variant = product.variants?.[0];
         const sku = variant?.sku;
