@@ -412,6 +412,12 @@ export default function AdminPage() {
               🍽️ Masa Takip
             </Link>
             <Link
+              href="/admin/pos"
+              className="rounded-full border border-[#e2ddd3] px-4 py-2 text-xs font-bold text-[#5b4032]"
+            >
+              🧾 Resto POS
+            </Link>
+            <Link
               href="/siparis-panel"
               className="rounded-full border border-[#e2ddd3] px-4 py-2 text-xs font-bold text-[#5b4032]"
             >

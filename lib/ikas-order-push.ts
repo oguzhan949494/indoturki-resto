@@ -122,6 +122,7 @@ export async function pushOrderToIkas(orderId: string): Promise<void> {
     .from("orders")
     .select(
       `id, order_number, source, customer_name, customer_phone, delivery_address, courier_fee_tl, pushed_to_ikas,
+       discount_type, discount_value, discount_scope,
        order_items ( quantity, unit_price_tl, product_name_tr, product_id, products ( source, ikas_product_id, ikas_variant_id ) )`
     )
     .eq("id", orderId)
@@ -131,15 +132,16 @@ export async function pushOrderToIkas(orderId: string): Promise<void> {
     throw new Error("Sipariş bulunamadı: " + orderId);
   }
 
-  // Sadece paket servis siparişleri ikas'a gönderiliyor; masa/gel-al/
-  // restoranda-yeme siparişleri ya da daha önce gönderilmiş bir sipariş
-  // tekrar gönderilmiyor.
-  if (order.source !== "delivery" || order.pushed_to_ikas) {
+  // Sadece paket servis ve Resto POS satışları ikas'a gönderiliyor; masa/
+  // gel-al/restoranda-yeme siparişleri (henüz ödenmemiş/kapatılmamış) ya
+  // da daha önce gönderilmiş bir sipariş tekrar gönderilmiyor.
+  if (!["delivery", "pos"].includes(order.source) || order.pushed_to_ikas) {
     return;
   }
 
   let foodTotal = 0;
-  const linkedLines: { variantId: string; quantity: number; price: number }[] = [];
+  const linkedLines: { variantId: string; quantity: number; price: number; isMarket: boolean }[] =
+    [];
 
   for (const item of (order as any).order_items ?? []) {
     const product = item.products;
@@ -152,9 +154,39 @@ export async function pushOrderToIkas(orderId: string): Promise<void> {
         variantId: product.ikas_variant_id,
         quantity: item.quantity,
         price: Number(item.unit_price_tl),
+        isMarket: product.source === "ikas",
       });
     } else {
       foodTotal += Number(item.unit_price_tl) * item.quantity;
+    }
+  }
+
+  // Resto POS'ta uygulanan indirimi (varsa), ikas'a gerçek sat  ş
+  // tutarları yansısın diye ilgili satırlara orantılı olarak dağıtıyoruz.
+  // "market" kapsamı sadece market satırlarını, "general" hepsini etkiler.
+  const discountScope = (order as any).discount_scope as "general" | "market" | null;
+  const discountType = (order as any).discount_type as "percent" | "fixed" | null;
+  const discountValue = Number((order as any).discount_value) || 0;
+
+  if (discountScope && discountType && discountValue > 0) {
+    const affectsFood = discountScope === "general";
+    const targetLines = linkedLines.filter((l) => discountScope === "general" || l.isMarket);
+    const targetSubtotal =
+      targetLines.reduce((s, l) => s + l.price * l.quantity, 0) + (affectsFood ? foodTotal : 0);
+
+    if (targetSubtotal > 0) {
+      const discountAmount =
+        discountType === "percent"
+          ? targetSubtotal * (discountValue / 100)
+          : Math.min(discountValue, targetSubtotal);
+      const ratio = discountAmount / targetSubtotal;
+
+      for (const line of targetLines) {
+        line.price = Math.round(line.price * (1 - ratio) * 100) / 100;
+      }
+      if (affectsFood) {
+        foodTotal = Math.round(foodTotal * (1 - ratio) * 100) / 100;
+      }
     }
   }
 
