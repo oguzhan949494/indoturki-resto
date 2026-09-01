@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import type { FormEvent } from "react";
 import Script from "next/script";
+import Link from "next/link";
 import { createClient } from "@/utils/supabase/client";
 import AddressPicker from "@/components/AddressPicker";
 import {
@@ -854,6 +855,20 @@ export default function Home() {
           </div>
         )}
       </section>
+
+      <footer className="mx-auto max-w-6xl px-4 pb-32 pt-4 text-center sm:px-6">
+        <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-[11px] font-bold text-[#a18b7b]">
+          <Link href="/mesafeli-satis-sozlesmesi" className="underline">
+            Mesafeli Satış Sözleşmesi
+          </Link>
+          <Link href="/iptal-iade-politikasi" className="underline">
+            İptal ve İade Politikası
+          </Link>
+          <Link href="/iletisim" className="underline">
+            Adres ve İletişim
+          </Link>
+        </div>
+      </footer>
 
       {cartCount > 0 && !checkoutOpen && (
         <div className="fixed bottom-4 left-1/2 z-40 w-[calc(100%-24px)] max-w-lg -translate-x-1/2">
