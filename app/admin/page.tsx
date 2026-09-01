@@ -13,6 +13,7 @@ type OrderItemRow = {
   unit_price_tl: number;
   item_note: string | null;
   options: string[] | null;
+  dynamic_options: { label: string; priceDelta: number }[] | null;
 };
 
 type OrderRow = {
@@ -128,6 +129,11 @@ function MutfakFisi({ order }: { order: OrderRow }) {
                 {item.options.map((code) => `• ${OPTION_LABELS[code]?.tr ?? code}`).join("  ")}
               </div>
             )}
+            {item.dynamic_options && item.dynamic_options.length > 0 && (
+              <div style={{ fontSize: 11 }}>
+                {item.dynamic_options.map((o) => `• ${o.label}`).join("  ")}
+              </div>
+            )}
             {item.item_note && <div style={{ fontSize: 11, fontStyle: "italic" }}>📝 {item.item_note}</div>}
           </div>
         ))}
@@ -161,7 +167,7 @@ export default function AdminPage() {
     const { data, error } = await supabase
       .from("orders")
       .select(
-        "id, order_number, source, table_id, is_takeaway, customer_name, customer_phone, delivery_address, delivery_lat, delivery_lng, delivery_note, leave_at_reception, pushed_to_ikas, ikas_push_error, courier_fee_tl, delivery_distance_km, total_tl, sambal_requested, order_status, payment_status, created_at, order_items(id, product_name_tr, quantity, unit_price_tl, item_note, options), restaurant_tables(table_number)"
+        "id, order_number, source, table_id, is_takeaway, customer_name, customer_phone, delivery_address, delivery_lat, delivery_lng, delivery_note, leave_at_reception, pushed_to_ikas, ikas_push_error, courier_fee_tl, delivery_distance_km, total_tl, sambal_requested, order_status, payment_status, created_at, order_items(id, product_name_tr, quantity, unit_price_tl, item_note, options, dynamic_options), restaurant_tables(table_number)"
       )
       .neq("order_status", "completed")
       .order("created_at", { ascending: false });
@@ -376,6 +382,12 @@ export default function AdminPage() {
             <p className="text-xs text-[#7a6f63]">Canlı sipariş ve personel çağrı takibi</p>
           </div>
           <div className="flex items-center gap-2">
+            <Link
+              href="/admin/secenekler"
+              className="rounded-full border border-[#e2ddd3] px-4 py-2 text-xs font-bold text-[#5b4032]"
+            >
+              ⚙️ Seçenek Yönetimi
+            </Link>
             <Link
               href="/admin/masalar"
               className="rounded-full border border-[#e2ddd3] px-4 py-2 text-xs font-bold text-[#5b4032]"
@@ -614,6 +626,18 @@ export default function AdminPage() {
                                 className="rounded-lg bg-orange-50 px-2 py-0.5 text-[11px] font-bold text-orange-800"
                               >
                                 {OPTION_LABELS[code]?.tr ?? code}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                        {item.dynamic_options && item.dynamic_options.length > 0 && (
+                          <div className="mt-0.5 flex flex-wrap gap-1">
+                            {item.dynamic_options.map((o, i) => (
+                              <span
+                                key={i}
+                                className="rounded-lg bg-blue-50 px-2 py-0.5 text-[11px] font-bold text-blue-800"
+                              >
+                                {o.label}
                               </span>
                             ))}
                           </div>

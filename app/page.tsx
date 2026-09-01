@@ -5,6 +5,12 @@ import type { FormEvent } from "react";
 import Script from "next/script";
 import Link from "next/link";
 import { createClient } from "@/utils/supabase/client";
+import {
+  loadCategoryOptionGroups,
+  defaultSelectionFor,
+  buildDynamicOptionLines,
+  type OptionGroup,
+} from "@/utils/option-groups";
 import { isRestaurantOpen, type RestaurantHoursSettings } from "@/utils/restaurant-hours";
 import AddressPicker from "@/components/AddressPicker";
 import {
@@ -71,6 +77,9 @@ export default function Home() {
   const supabase = createClient();
 
   const [categories, setCategories] = useState<Category[]>([]);
+  const [categoryOptionGroups, setCategoryOptionGroups] = useState<Record<string, OptionGroup[]>>(
+    {}
+  );
   const [products, setProducts] = useState<Product[]>([]);
   const [idrRate, setIdrRate] = useState(500);
   const [bankInfo, setBankInfo] = useState({
@@ -165,6 +174,8 @@ export default function Home() {
 
       setCategories(mapCategories(categoryData));
       setProducts(mapProducts(productData));
+
+      loadCategoryOptionGroups(supabase).then(setCategoryOptionGroups);
       setLoading(false);
     }
 
@@ -355,6 +366,13 @@ export default function Home() {
       const catName = categoryNameForProduct(product);
       const isBeverage = categoryIsBeverage(catName);
       const noodleType = categoryAllowsNoodleTypeChoice(catName) ? "noodle150" : null;
+
+      const groupsForCategory = categoryOptionGroups[product.categoryId] ?? [];
+      const dynamicSelections: Record<string, string[]> = {};
+      for (const group of groupsForCategory) {
+        dynamicSelections[group.id] = defaultSelectionFor(group);
+      }
+
       return [
         ...current,
         {
@@ -365,6 +383,7 @@ export default function Home() {
           extraPilav: false,
           extraNoodle: false,
           noodleType,
+          dynamicSelections,
         },
       ];
     });
@@ -396,7 +415,7 @@ export default function Home() {
 
   const cartCount = cart.reduce((sum, line) => sum + line.quantity, 0);
   const cartTotal = cart.reduce(
-    (sum, line) => sum + lineUnitPrice(line) * line.quantity,
+    (sum, line) => sum + lineUnitPrice(line, categoryOptionGroups) * line.quantity,
     0
   );
   const grandTotal = orderType === "delivery" ? cartTotal + (courierFee ?? 0) : cartTotal;
@@ -579,10 +598,15 @@ export default function Home() {
         product_name_tr: line.product.nameTr,
         product_name_id: line.product.nameId,
         quantity: line.quantity,
-        unit_price_tl: lineUnitPrice(line),
-        unit_price_idr: lineUnitPrice(line) * idrRate,
+        unit_price_tl: lineUnitPrice(line, categoryOptionGroups),
+        unit_price_idr: lineUnitPrice(line, categoryOptionGroups) * idrRate,
         options: lineOptionCodes(line),
         item_note: line.note?.trim() || null,
+        dynamic_options: buildDynamicOptionLines(
+          categoryOptionGroups[line.product.categoryId] ?? [],
+          line.dynamicSelections ?? {},
+          lang
+        ),
       }));
 
       const { error: itemsError } = await supabase
@@ -1096,7 +1120,7 @@ export default function Home() {
                             <div className="min-w-0">
                               <div className="font-black">{productName(line.product)}</div>
                               <div className="text-sm text-[#806b5b]">
-                                {formatTL(lineUnitPrice(line))} × {line.quantity}
+                                {formatTL(lineUnitPrice(line, categoryOptionGroups))} × {line.quantity}
                               </div>
                             </div>
                             <div className="flex items-center gap-2">
@@ -1188,6 +1212,55 @@ export default function Home() {
                                 ))}
                               </div>
                             )}
+
+                            {(categoryOptionGroups[line.product.categoryId] ?? []).map((group) => {
+                              const selected = line.dynamicSelections?.[group.id] ?? [];
+                              const setSelected = (next: string[]) =>
+                                updateCartLine(line.product.id, {
+                                  dynamicSelections: {
+                                    ...line.dynamicSelections,
+                                    [group.id]: next,
+                                  },
+                                });
+                              return (
+                                <div key={group.id} className="rounded-xl bg-[#faf5ee] p-2">
+                                  <p className="mb-1 text-[11px] font-black text-[#806b5b]">
+                                    {lang === "tr" ? group.nameTr : group.nameId}
+                                  </p>
+                                  {group.choices.map((choice) => {
+                                    const isChecked = selected.includes(choice.id);
+                                    const name = lang === "tr" ? choice.nameTr : choice.nameId;
+                                    return (
+                                      <label
+                                        key={choice.id}
+                                        className="flex cursor-pointer items-center gap-2 py-0.5 text-xs font-bold"
+                                      >
+                                        <input
+                                          type={group.type === "single" ? "radio" : "checkbox"}
+                                          name={`dyn-${group.id}-${line.product.id}`}
+                                          checked={isChecked}
+                                          onChange={() => {
+                                            if (group.type === "single") {
+                                              setSelected([choice.id]);
+                                            } else {
+                                              setSelected(
+                                                isChecked
+                                                  ? selected.filter((id) => id !== choice.id)
+                                                  : [...selected, choice.id]
+                                              );
+                                            }
+                                          }}
+                                          className="h-4 w-4 accent-[#ef2b1e]"
+                                        />
+                                        {name}
+                                        {choice.priceDelta !== 0 &&
+                                          ` (${choice.priceDelta > 0 ? "+" : ""}${choice.priceDelta}₺)`}
+                                      </label>
+                                    );
+                                  })}
+                                </div>
+                              );
+                            })}
                           </div>
 
                           <input

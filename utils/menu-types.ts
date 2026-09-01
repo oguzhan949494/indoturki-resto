@@ -60,6 +60,7 @@ export type CartLine = {
   extraPilav: boolean;
   extraNoodle: boolean;
   noodleType: NoodleType | null;
+  dynamicSelections: Record<string, string[]>;
 };
 
 export const ALL_CATEGORY_ID = "__all__";
@@ -137,10 +138,25 @@ export function categoryAllowsNoodleTypeChoice(categoryNameTr: string) {
 }
 
 // Bir sepet satırının, seçilen eklentilerle birlikte birim fiyatı.
-export function lineUnitPrice(line: CartLine): number {
+export function lineUnitPrice(
+  line: CartLine,
+  categoryOptionGroups?: Record<string, { id: string; choices: { id: string; priceDelta: number }[] }[]>
+): number {
   let price = line.product.price;
   if (line.extraPilav) price += EXTRA_ADDON_PRICE;
   if (line.extraNoodle) price += EXTRA_ADDON_PRICE;
+
+  if (categoryOptionGroups) {
+    const groups = categoryOptionGroups[line.product.categoryId] ?? [];
+    for (const group of groups) {
+      const selected = line.dynamicSelections?.[group.id] ?? [];
+      for (const choiceId of selected) {
+        const choice = group.choices.find((c) => c.id === choiceId);
+        if (choice) price += choice.priceDelta;
+      }
+    }
+  }
+
   return price;
 }
 

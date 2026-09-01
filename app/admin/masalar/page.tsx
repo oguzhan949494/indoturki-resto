@@ -19,6 +19,7 @@ type OrderItemDetail = {
   unit_price_tl: number;
   item_note: string | null;
   options: string[] | null;
+  dynamic_options: { label: string; priceDelta: number }[] | null;
   split_group: number | null;
   isTakeaway: boolean;
 };
@@ -92,7 +93,7 @@ export default function MasaTakipPage() {
       const { data: orderRows } = await supabase
         .from("orders")
         .select(
-          "id, is_takeaway, order_items(id, order_id, product_id, product_name_tr, quantity, unit_price_tl, item_note, options, split_group)"
+          "id, is_takeaway, order_items(id, order_id, product_id, product_name_tr, quantity, unit_price_tl, item_note, options, dynamic_options, split_group)"
         )
         .eq("table_session_id", sessionId);
 
@@ -418,6 +419,18 @@ export default function MasaTakipPage() {
                                       className="rounded-lg bg-orange-50 px-2 py-0.5 text-[10px] font-bold text-orange-800"
                                     >
                                       {OPTION_LABELS[code]?.tr ?? code}
+                                    </span>
+                                  ))}
+                                </div>
+                              )}
+                              {item.dynamic_options && item.dynamic_options.length > 0 && (
+                                <div className="mt-1 flex flex-wrap gap-1">
+                                  {item.dynamic_options.map((o, i) => (
+                                    <span
+                                      key={i}
+                                      className="rounded-lg bg-blue-50 px-2 py-0.5 text-[10px] font-bold text-blue-800"
+                                    >
+                                      {o.label}
                                     </span>
                                   ))}
                                 </div>
