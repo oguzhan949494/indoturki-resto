@@ -109,7 +109,7 @@ export default function RestoPosPage() {
     if (!menuModalAcik && !tablesModalAcik && !manuelModalAcik && !odemeModalAcik) {
       barkodRef.current?.focus();
     }
-  }, [menuModalAcik, tablesModalAcik, manuelModalAcik, odemeModalAcik]);
+  }, [menuModalAcik, tablesModalAcik, manuelModalAcik, odemeModalAcik, fiyatGorModu, fiyatGorSonuc]);
 
   // Barkod okuyucu ile sistemdeki kayıt arasında baştaki rakam sayısı
   // tutmayabiliyor (fazladan eklenmiş ya da eksik olabiliyor) — bu yüzden
