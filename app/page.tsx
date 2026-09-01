@@ -5,6 +5,7 @@ import type { FormEvent } from "react";
 import Script from "next/script";
 import Link from "next/link";
 import { createClient } from "@/utils/supabase/client";
+import { isRestaurantOpen, type RestaurantHoursSettings } from "@/utils/restaurant-hours";
 import AddressPicker from "@/components/AddressPicker";
 import {
   ALL_CATEGORY_ID,
@@ -103,6 +104,7 @@ export default function Home() {
   const [deliveryDate, setDeliveryDate] = useState("");
   const [deliveryTime, setDeliveryTime] = useState("");
   const [deliveryTiming, setDeliveryTiming] = useState<"now" | "scheduled">("now");
+  const [restaurantOpen, setRestaurantOpen] = useState(true);
   const [orderType, setOrderType] = useState<"delivery" | "pickup" | "dinein">("delivery");
   const [orderNumber, setOrderNumber] = useState("");
   const [completedOrderId, setCompletedOrderId] = useState<string | null>(null);
@@ -140,7 +142,7 @@ export default function Home() {
       const { data: settingsData, error: settingsError } = await supabase
         .from("restaurant_settings")
         .select(
-          "idr_rate, bank_tl_account_name, bank_tl_iban, bank_idr_bank, bank_idr_account_name, bank_idr_account_number"
+          "idr_rate, bank_tl_account_name, bank_tl_iban, bank_idr_bank, bank_idr_account_name, bank_idr_account_number, opening_time, closing_time, manual_status"
         )
         .limit(1)
         .maybeSingle();
@@ -154,6 +156,11 @@ export default function Home() {
           idrAccountName: settingsData.bank_idr_account_name ?? "",
           idrAccountNumber: settingsData.bank_idr_account_number ?? "",
         });
+        const open = isRestaurantOpen(settingsData as RestaurantHoursSettings);
+        setRestaurantOpen(open);
+        if (!open) {
+          setDeliveryTiming("scheduled");
+        }
       }
 
       setCategories(mapCategories(categoryData));
@@ -1283,15 +1290,23 @@ export default function Home() {
                       <p className="mb-2 text-xs font-black uppercase tracking-wide text-[#806b5b]">
                         {tr.deliveryTimingLabel}
                       </p>
+                      {!restaurantOpen && (
+                        <p className="mb-2 text-xs font-bold text-red-600">
+                          {lang === "tr"
+                            ? "🕐 Şu anda kapalıyız, sadece ileri tarihli sipariş alabiliyoruz."
+                            : "🕐 Kami sedang tutup, hanya menerima pesanan untuk waktu mendatang."}
+                        </p>
+                      )}
                       <div className="flex gap-2">
                         <button
                           type="button"
+                          disabled={!restaurantOpen}
                           onClick={() => {
                             setDeliveryTiming("now");
                             setDeliveryDate("");
                             setDeliveryTime("");
                           }}
-                          className={`flex-1 rounded-2xl px-4 py-3 text-sm font-black transition ${
+                          className={`flex-1 rounded-2xl px-4 py-3 text-sm font-black transition disabled:cursor-not-allowed disabled:opacity-40 ${
                             deliveryTiming === "now"
                               ? "bg-[#ef2b1e] text-white shadow-sm"
                               : "border border-[#e5d4c2] bg-white text-[#5b4032]"

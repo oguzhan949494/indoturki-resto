@@ -20,6 +20,7 @@ type OrderItemDetail = {
   item_note: string | null;
   options: string[] | null;
   split_group: number | null;
+  isTakeaway: boolean;
 };
 
 type ProductOption = {
@@ -90,13 +91,15 @@ export default function MasaTakipPage() {
 
       const { data: orderRows } = await supabase
         .from("orders")
-        .select("id, order_items(id, order_id, product_id, product_name_tr, quantity, unit_price_tl, item_note, options, split_group)")
+        .select(
+          "id, is_takeaway, order_items(id, order_id, product_id, product_name_tr, quantity, unit_price_tl, item_note, options, split_group)"
+        )
         .eq("table_session_id", sessionId);
 
       const tumItems: OrderItemDetail[] = [];
       for (const order of orderRows ?? []) {
         for (const item of (order as any).order_items ?? []) {
-          tumItems.push(item);
+          tumItems.push({ ...item, isTakeaway: (order as any).is_takeaway ?? false });
         }
       }
       setItems(tumItems);
@@ -194,7 +197,6 @@ export default function MasaTakipPage() {
       const { data: productRows } = await supabase
         .from("products")
         .select("id, name_tr, price_tl, category_id")
-        .eq("is_available", true)
         .order("sort_order", { ascending: true });
 
       setCategories((categoryRows as CategoryOption[]) ?? []);
@@ -397,7 +399,14 @@ export default function MasaTakipPage() {
                         >
                           <div className="flex items-center justify-between gap-3">
                             <div className="min-w-0">
-                              <div className="font-bold">{item.product_name_tr}</div>
+                              <div className="flex items-center gap-1.5">
+                                <div className="font-bold">{item.product_name_tr}</div>
+                                {item.isTakeaway && (
+                                  <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-black text-amber-800">
+                                    📦 Al-Götür
+                                  </span>
+                                )}
+                              </div>
                               <div className="text-xs text-[#7a6f63]">
                                 {item.unit_price_tl.toLocaleString("tr-TR")} TL × {item.quantity}
                               </div>

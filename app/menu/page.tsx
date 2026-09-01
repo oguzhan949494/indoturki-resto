@@ -4,6 +4,7 @@ import { Suspense, useEffect, useMemo, useState } from "react";
 import type { FormEvent } from "react";
 import { useSearchParams } from "next/navigation";
 import { createClient } from "@/utils/supabase/client";
+import { isRestaurantOpen, type RestaurantHoursSettings } from "@/utils/restaurant-hours";
 import Link from "next/link";
 import {
   ALL_CATEGORY_ID,
@@ -65,6 +66,18 @@ function TableMenu() {
   const [callSending, setCallSending] = useState(false);
   const [callSent, setCallSent] = useState<string | null>(null);
 
+  // Yeni giriş akışı: yükleniyor -> (kapalıysa) uyarı -> seçim ekranı -> sipariş.
+  const [entryStage, setEntryStage] = useState<
+    "loading" | "closedNotice" | "choice" | "ordering"
+  >("loading");
+  const [orderMode, setOrderMode] = useState<"dinein" | "takeaway" | null>(null);
+  const [restaurantOpen, setRestaurantOpen] = useState(true);
+  const [tableTotal, setTableTotal] = useState(0);
+  const [tableDetailItems, setTableDetailItems] = useState<
+    { id: string; name: string; quantity: number; price: number; isMarket: boolean }[]
+  >([]);
+  const [tableDetailOpen, setTableDetailOpen] = useState(false);
+
   useEffect(() => {
     async function loadData() {
       setLoading(true);
@@ -124,12 +137,57 @@ function TableMenu() {
 
       setCategories(mapCategories(categoryData));
       setProducts(mapProducts(productData));
+
+      const { data: hoursData } = await supabase
+        .from("restaurant_settings")
+        .select("opening_time, closing_time, manual_status")
+        .limit(1)
+        .maybeSingle();
+      const open = isRestaurantOpen(hoursData as RestaurantHoursSettings | null);
+      setRestaurantOpen(open);
+
       setLoading(false);
+      setEntryStage(open ? "choice" : "closedNotice");
     }
 
     loadData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tableNumber]);
+
+  // Masanın açık oturumundaki toplam tutarı ve ürünleri çeker (müşteriye
+  // "bu masanın toplamı" olarak gösterebilmek için).
+  const loadTableTotal = async (sessionId: string) => {
+    const { data: orderRows } = await supabase
+      .from("orders")
+      .select(
+        "order_items ( id, quantity, unit_price_tl, product_name_tr, product_id, products ( source ) )"
+      )
+      .eq("table_session_id", sessionId);
+
+    const items: { id: string; name: string; quantity: number; price: number; isMarket: boolean }[] = [];
+    let total = 0;
+    for (const order of orderRows ?? []) {
+      for (const item of (order as any).order_items ?? []) {
+        items.push({
+          id: item.id,
+          name: item.product_name_tr,
+          quantity: item.quantity,
+          price: item.unit_price_tl,
+          isMarket: item.products?.source === "ikas",
+        });
+        total += item.unit_price_tl * item.quantity;
+      }
+    }
+    setTableDetailItems(items);
+    setTableTotal(total);
+  };
+
+  useEffect(() => {
+    if (tableSessionId) {
+      loadTableTotal(tableSessionId);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tableSessionId]);
 
   const tr = {
     menuSearch: lang === "tr" ? "Menüde ara..." : "Cari di menu...",
@@ -280,6 +338,7 @@ function TableMenu() {
           source: "table",
           table_id: tableId,
           table_session_id: tableSessionId,
+          is_takeaway: orderMode === "takeaway",
           total_tl: cartTotal,
           total_idr: 0,
           sambal_requested: cart.some((line) => line.sambal),
@@ -355,6 +414,167 @@ function TableMenu() {
           <div className="text-4xl">⚠️</div>
           <p className="mt-4 font-bold">{tr.tableNotFound}</p>
         </div>
+      </main>
+    );
+  }
+
+  if (entryStage === "loading") {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-[#f7eee3] text-[#231710]">
+        <p className="font-bold text-[#806b5b]">
+          {lang === "tr" ? "Yükleniyor..." : "Memuat..."}
+        </p>
+      </main>
+    );
+  }
+
+  if (entryStage === "closedNotice") {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-[#f7eee3] p-6 text-[#231710]">
+        <div className="max-w-sm rounded-3xl border border-[#e6d5c4] bg-white p-8 text-center shadow-lg">
+          <div className="text-4xl">🕐</div>
+          <h1 className="mt-4 text-lg font-black">
+            {lang === "tr" ? "Mutfak şu anda kapalı" : "Dapur sedang tutup"}
+          </h1>
+          <p className="mt-2 text-sm text-[#806b5b]">
+            {lang === "tr"
+              ? "Dilerseniz Al-Götür için ileri tarihli sipariş oluşturabilirsiniz."
+              : "Anda tetap dapat membuat pesanan ambil sendiri untuk waktu mendatang."}
+          </p>
+          <button
+            onClick={() => setEntryStage("choice")}
+            className="mt-6 w-full rounded-2xl bg-[#231710] py-3 text-sm font-black text-white"
+          >
+            {lang === "tr" ? "Tamam" : "Oke"}
+          </button>
+        </div>
+      </main>
+    );
+  }
+
+  if (entryStage === "choice") {
+    return (
+      <main className="flex min-h-screen flex-col items-center justify-center bg-[#f7eee3] p-6 text-[#231710]">
+        <div className="w-full max-w-sm">
+          <div className="mb-6 text-center">
+            <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-[#ef2b1e] text-2xl shadow-sm">
+              🍽️
+            </div>
+            <h1 className="text-lg font-black">
+              {tr.tableLabel} {tableNumber}
+            </h1>
+          </div>
+
+          {tableTotal > 0 && (
+            <button
+              onClick={() => setTableDetailOpen(true)}
+              className="mb-4 w-full rounded-2xl border border-[#e6d5c4] bg-white p-4 text-left shadow-sm"
+            >
+              <div className="text-xs font-bold text-[#806b5b]">
+                {lang === "tr" ? "Bu masanın toplamı" : "Total meja ini"}
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-xl font-black text-[#ef2b1e]">
+                  {tableTotal.toLocaleString("tr-TR")} TL
+                </span>
+                <span className="text-xs font-bold underline">
+                  {lang === "tr" ? "Detayı Gör" : "Lihat Detail"}
+                </span>
+              </div>
+            </button>
+          )}
+
+          <div className="space-y-3">
+            <button
+              onClick={() => {
+                if (!restaurantOpen) return;
+                setOrderMode("dinein");
+                setEntryStage("ordering");
+              }}
+              disabled={!restaurantOpen}
+              className="w-full rounded-3xl bg-[#231710] p-6 text-left text-white shadow-lg disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              <div className="text-3xl">🍽️</div>
+              <div className="mt-2 text-lg font-black">
+                {lang === "tr" ? "Restoranda Yiyeceğim" : "Makan di Tempat"}
+              </div>
+              {!restaurantOpen && (
+                <div className="mt-1 text-xs font-bold text-white/70">
+                  {lang === "tr" ? "Mutfak kapalı" : "Dapur tutup"}
+                </div>
+              )}
+            </button>
+
+            <button
+              onClick={() => {
+                setOrderMode("takeaway");
+                setEntryStage("ordering");
+              }}
+              className="w-full rounded-3xl border-2 border-[#231710] bg-white p-6 text-left text-[#231710] shadow-lg"
+            >
+              <div className="text-3xl">🥡</div>
+              <div className="mt-2 text-lg font-black">
+                {lang === "tr" ? "Al-Götür" : "Bawa Pulang"}
+              </div>
+            </button>
+          </div>
+        </div>
+
+        {tableDetailOpen && (
+          <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 p-4 sm:items-center">
+            <div className="flex max-h-[80vh] w-full max-w-sm flex-col rounded-3xl bg-white p-5 shadow-2xl">
+              <div className="mb-3 flex items-center justify-between">
+                <button
+                  onClick={() => setTableDetailOpen(false)}
+                  className="rounded-full border border-[#e4d3c1] px-3 py-1.5 text-xs font-bold text-[#5b4032]"
+                >
+                  ← {lang === "tr" ? "Geri" : "Kembali"}
+                </button>
+                <h3 className="text-sm font-black">
+                  {tr.tableLabel} {tableNumber}
+                </h3>
+              </div>
+
+              <div className="flex-1 space-y-2 overflow-y-auto">
+                {tableDetailItems.map((item) => (
+                  <div
+                    key={item.id}
+                    className="flex items-center justify-between rounded-xl border border-[#eee7db] px-3 py-2"
+                  >
+                    <div>
+                      <div className="text-sm font-bold">
+                        {item.quantity}x {item.name}
+                      </div>
+                      <div className="text-xs text-[#806b5b]">
+                        {(item.price * item.quantity).toLocaleString("tr-TR")} TL
+                      </div>
+                    </div>
+                    {item.isMarket ? (
+                      <button
+                        onClick={async () => {
+                          await supabase.from("order_items").delete().eq("id", item.id);
+                          if (tableSessionId) loadTableTotal(tableSessionId);
+                        }}
+                        className="rounded-full border border-red-300 px-2 py-1 text-xs font-bold text-red-600"
+                      >
+                        🗑️
+                      </button>
+                    ) : (
+                      <span className="text-[10px] font-bold text-[#a18b7b]">
+                        {lang === "tr" ? "personele danışın" : "hubungi staf"}
+                      </span>
+                    )}
+                  </div>
+                ))}
+              </div>
+
+              <div className="mt-3 flex items-center justify-between border-t border-[#eee7db] pt-3 text-sm font-black">
+                <span>{lang === "tr" ? "Toplam" : "Total"}</span>
+                <span>{tableTotal.toLocaleString("tr-TR")} TL</span>
+              </div>
+            </div>
+          </div>
+        )}
       </main>
     );
   }

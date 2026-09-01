@@ -20,6 +20,7 @@ type OrderRow = {
   order_number: number;
   source: "delivery" | "table" | "pickup" | "dinein";
   table_id: string | null;
+  is_takeaway: boolean;
   customer_name: string | null;
   customer_phone: string | null;
   delivery_address: string | null;
@@ -84,7 +85,7 @@ const ORDER_SOURCE_LABEL: Record<string, string> = {
 function MutfakFisi({ order }: { order: OrderRow }) {
   const kaynakYazi =
     order.source === "table"
-      ? `🍽️ Masa ${order.restaurant_tables?.table_number ?? "?"}`
+      ? `🍽️ Masa ${order.restaurant_tables?.table_number ?? "?"}${order.is_takeaway ? " — 📦 AL-GÖTÜR" : ""}`
       : ORDER_SOURCE_LABEL[order.source] ?? order.source;
 
   return (
@@ -149,12 +150,18 @@ export default function AdminPage() {
   const [loading, setLoading] = useState(true);
   const [soundOn, setSoundOn] = useState(true);
   const [printingOrder, setPrintingOrder] = useState<OrderRow | null>(null);
+  const [openingTime, setOpeningTime] = useState("10:00");
+  const [closingTime, setClosingTime] = useState("22:00");
+  const [manualStatus, setManualStatus] = useState<"auto" | "force_open" | "force_closed">(
+    "auto"
+  );
+  const [hoursSaving, setHoursSaving] = useState(false);
 
   const loadOrders = useCallback(async () => {
     const { data, error } = await supabase
       .from("orders")
       .select(
-        "id, order_number, source, table_id, customer_name, customer_phone, delivery_address, delivery_lat, delivery_lng, delivery_note, leave_at_reception, pushed_to_ikas, ikas_push_error, courier_fee_tl, delivery_distance_km, total_tl, sambal_requested, order_status, payment_status, created_at, order_items(id, product_name_tr, quantity, unit_price_tl, item_note, options), restaurant_tables(table_number)"
+        "id, order_number, source, table_id, is_takeaway, customer_name, customer_phone, delivery_address, delivery_lat, delivery_lng, delivery_note, leave_at_reception, pushed_to_ikas, ikas_push_error, courier_fee_tl, delivery_distance_km, total_tl, sambal_requested, order_status, payment_status, created_at, order_items(id, product_name_tr, quantity, unit_price_tl, item_note, options), restaurant_tables(table_number)"
       )
       .neq("order_status", "completed")
       .order("created_at", { ascending: false });
@@ -221,6 +228,36 @@ export default function AdminPage() {
       // sessizce yut
     }
   }, [soundOn]);
+
+  const loadHoursSettings = useCallback(async () => {
+    const { data } = await supabase
+      .from("restaurant_settings")
+      .select("opening_time, closing_time, manual_status")
+      .limit(1)
+      .maybeSingle();
+    if (data) {
+      setOpeningTime((data.opening_time as string)?.slice(0, 5) ?? "10:00");
+      setClosingTime((data.closing_time as string)?.slice(0, 5) ?? "22:00");
+      setManualStatus((data.manual_status as any) ?? "auto");
+    }
+  }, [supabase]);
+
+  const saveHoursSettings = async (patch: {
+    opening_time?: string;
+    closing_time?: string;
+    manual_status?: "auto" | "force_open" | "force_closed";
+  }) => {
+    setHoursSaving(true);
+    const { data: row } = await supabase.from("restaurant_settings").select("id").limit(1).maybeSingle();
+    if (row?.id) {
+      await supabase.from("restaurant_settings").update(patch).eq("id", row.id);
+    }
+    setHoursSaving(false);
+  };
+
+  useEffect(() => {
+    loadHoursSettings();
+  }, [loadHoursSettings]);
 
   useEffect(() => {
     setLoading(true);
@@ -388,6 +425,62 @@ export default function AdminPage() {
         </div>
       </header>
 
+      <section className="mx-auto max-w-5xl px-4 pt-4 sm:px-8">
+        <div className="rounded-2xl border border-[#e2ddd3] bg-white p-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h3 className="text-sm font-black">🕐 Çalışma Saatleri</h3>
+              <p className="text-xs text-[#7a6f63]">
+                Kapalı saatlerde müşteriler "Şimdi" seçeneğini kullanamaz.
+              </p>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <input
+                type="time"
+                value={openingTime}
+                onChange={(e) => setOpeningTime(e.target.value)}
+                onBlur={() => saveHoursSettings({ opening_time: openingTime })}
+                className="rounded-xl border border-[#e5d4c2] px-3 py-2 text-sm font-bold"
+              />
+              <span className="text-sm font-bold text-[#a18b7b]">—</span>
+              <input
+                type="time"
+                value={closingTime}
+                onChange={(e) => setClosingTime(e.target.value)}
+                onBlur={() => saveHoursSettings({ closing_time: closingTime })}
+                className="rounded-xl border border-[#e5d4c2] px-3 py-2 text-sm font-bold"
+              />
+            </div>
+          </div>
+
+          <div className="mt-3 flex flex-wrap gap-2">
+            {(
+              [
+                ["auto", "🕐 Otomatik (Saatlere Göre)"],
+                ["force_open", "🟢 Zorla Açık"],
+                ["force_closed", "🔴 Zorla Kapalı"],
+              ] as const
+            ).map(([value, label]) => (
+              <button
+                key={value}
+                onClick={() => {
+                  setManualStatus(value);
+                  saveHoursSettings({ manual_status: value });
+                }}
+                disabled={hoursSaving}
+                className={`rounded-full px-4 py-2 text-xs font-black transition ${
+                  manualStatus === value
+                    ? "bg-[#231710] text-white"
+                    : "border border-[#e5d4c2] text-[#5b4032]"
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
+      </section>
+
       <section className="mx-auto max-w-5xl px-4 py-6 sm:px-8">
         {loading ? (
           <p className="text-center font-bold text-[#7a6f63]">Yükleniyor...</p>
@@ -416,6 +509,11 @@ export default function AdminPage() {
                                 : `🍽️ Masa ${order.restaurant_tables?.table_number ?? "?"}`}
                         </span>
                         <span className="text-xs text-[#a89d8e]">{timeAgo(order.created_at)}</span>
+                        {order.source === "table" && order.is_takeaway && (
+                          <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-black text-amber-800">
+                            📦 Al-Götür
+                          </span>
+                        )}
                       </div>
                       {(order.source === "delivery" ||
                         order.source === "pickup" ||
