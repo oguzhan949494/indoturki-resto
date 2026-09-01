@@ -456,6 +456,23 @@ function TableMenu() {
     return (
       <main className="flex min-h-screen flex-col items-center justify-center bg-[#f7eee3] p-6 text-[#231710]">
         <div className="w-full max-w-sm">
+          <div className="mb-4 flex justify-center">
+            <div className="flex rounded-full border border-[#e4d3c1] bg-white p-1 text-xs font-black">
+              <button
+                onClick={() => setLang("tr")}
+                className={`rounded-full px-3 py-1.5 transition ${lang === "tr" ? "bg-[#ef2b1e] text-white" : "text-[#6d5547]"}`}
+              >
+                🇹🇷 TR
+              </button>
+              <button
+                onClick={() => setLang("id")}
+                className={`rounded-full px-3 py-1.5 transition ${lang === "id" ? "bg-[#ef2b1e] text-white" : "text-[#6d5547]"}`}
+              >
+                🇮🇩 ID
+              </button>
+            </div>
+          </div>
+
           <div className="mb-6 text-center">
             <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-[#ef2b1e] text-2xl shadow-sm">
               🍽️
