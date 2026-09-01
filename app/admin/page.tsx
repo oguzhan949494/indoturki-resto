@@ -215,26 +215,6 @@ export default function AdminPage() {
 
   // Diğer olaylar (personel çağrısı gibi) için kısa, basit bir bip sesi —
   // ses dosyasına ihtiyaç duymadan tarayıcıda anlık üretiliyor.
-  const playBeep = useCallback(() => {
-    if (!soundOn) return;
-    try {
-      const AudioContextClass =
-        window.AudioContext ||
-        (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
-      const ctx = new AudioContextClass();
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-      osc.frequency.value = 880;
-      gain.gain.setValueAtTime(0.18, ctx.currentTime);
-      osc.start();
-      osc.stop(ctx.currentTime + 0.15);
-    } catch {
-      // sessizce yut
-    }
-  }, [soundOn]);
-
   const loadHoursSettings = useCallback(async () => {
     const { data } = await supabase
       .from("restaurant_settings")
@@ -323,7 +303,7 @@ export default function AdminPage() {
         "postgres_changes",
         { event: "INSERT", schema: "public", table: "staff_calls" },
         () => {
-          playBeep();
+          playNewOrderSound();
           loadCalls();
         }
       )
