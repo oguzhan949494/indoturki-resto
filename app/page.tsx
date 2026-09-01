@@ -232,6 +232,10 @@ export default function Home() {
     leaveAtReception:
       lang === "tr" ? "Resepsiyona bırakabilirsiniz" : "Dapat dititipkan di resepsionis",
     address: lang === "tr" ? "Teslimat adresi" : "Alamat pengiriman",
+    addressSelectInstruction:
+      lang === "tr"
+        ? "⚠️ Devam edebilmek için, aşağıda çıkan önerilerden adresinizi seçin. Açık adresinizi (bina/daire no vb.) aşağıdaki not alanına yazabilirsiniz."
+        : "⚠️ Untuk melanjutkan, pilih alamat Anda dari saran yang muncul di bawah. Anda dapat menuliskan alamat lengkap (nomor bangunan/apartemen dll.) di kolom catatan di bawah.",
     dragHint:
       lang === "tr"
         ? "İşaretçiyi (pin) sürükleyerek tam konumunuzu ayarlayabilirsiniz."
@@ -1253,6 +1257,9 @@ export default function Home() {
                     />
                     {orderType === "delivery" && (
                       <div className="sm:col-span-2">
+                        <p className="mb-2 rounded-xl bg-amber-50 px-3 py-2 text-xs font-bold text-amber-800">
+                          {tr.addressSelectInstruction}
+                        </p>
                         <AddressPicker
                           address={deliveryAddress}
                           onAddressChange={setDeliveryAddress}
