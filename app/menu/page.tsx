@@ -409,6 +409,15 @@ function TableMenu() {
       setOrderComplete(true);
       setCart([]);
       setNote("");
+
+      const modeLabel = orderMode === "takeaway" ? "📦 Al-Götür" : "🍽️ Restoranda";
+      fetch("/api/notify-telegram", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          message: `🆕 <b>Yeni Sipariş — ID-${orderData.order_number}</b>\n🪑 Masa ${tableNumber} ${modeLabel}\n💰 ${cartTotal.toLocaleString("tr-TR")} TL`,
+        }),
+      }).catch(() => {});
     } finally {
       setSubmitting(false);
     }

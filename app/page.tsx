@@ -632,6 +632,20 @@ export default function Home() {
       setOrderComplete(true);
       setCart([]);
       fetchPaytrToken(orderData.id);
+
+      const orderTypeLabel =
+        orderType === "delivery"
+          ? "🚚 Paket Servis"
+          : orderType === "pickup"
+            ? "🥡 Gel Al"
+            : "🍽️ Restoranda Yiyeceğim";
+      fetch("/api/notify-telegram", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          message: `🆕 <b>Yeni Sipariş — ID-${orderData.order_number}</b>\n${orderTypeLabel}\n👤 ${customerName}\n📞 ${customerPhone}\n💰 ${grandTotal.toLocaleString("tr-TR")} TL`,
+        }),
+      }).catch(() => {});
     } catch (error) {
       console.error("SİPARİŞ HATASI:", error);
       alert(
