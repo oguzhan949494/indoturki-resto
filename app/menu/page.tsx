@@ -442,6 +442,15 @@ function TableMenu() {
         setCallSent(null);
         setCallOpen(false);
       }, 1800);
+
+      const callLabel = CALL_TYPES.find((c) => c.id === callType)?.tr ?? callType;
+      fetch("/api/notify-telegram", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          message: `🔔 <b>Personel Çağrısı</b>\n🪑 Masa ${tableNumber} — ${callLabel}`,
+        }),
+      }).catch(() => {});
     } finally {
       setCallSending(false);
     }
